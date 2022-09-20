@@ -25,11 +25,14 @@ class Player:
         ray2ray_angle = fov/(resolution - 1)
         for ray_id in range(resolution):
             a = (self.r - fov / 2) + ray2ray_angle * ray_id
-            x = -np.cos(a)
-            y = -np.sin(a)
-            ray = np.array((x, y), dtype=np.float)
-            rays.append(ray)
+            rays.append(Ray(-np.cos(a), -np.sin(a)))
         return rays
+
+
+class Ray:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
 
 
 class World:
@@ -101,7 +104,6 @@ class Game:
     
     def update_player(self):
         self.player.rays = self.player.generate_rays(self.fov, self.render_resolution)
-        
         self.Vx = 0
         self.Vy = 0
         if self.a_pressed and not self.d_pressed and self.player.x >= 0:
@@ -157,8 +159,34 @@ class Game:
                     self.mouse_button = True
                 else:
                     self.mouse_button = False
-                    
     
+    
+    
+    
+    def check_for_line_line_intersection(self, line1, line2):
+        x1 = line1[0][0]
+        x2 = line1[1][0]
+        x3 = line2[0][0]
+        x4 = line2[1][0]
+        y1 = line1[0][1]
+        y2 = line1[1][1]
+        y3 = line2[0][1]
+        y4 = line2[1][1]
+        
+        d = ((x1-x2) * (y3-y4) - (y1-y2) * (x3-x4))
+        if d == 0:
+            return False
+        
+        t = ((x1-x3) * (y3-y4) - (y1-y3) * (x3-x4)) / d
+        u = -((x1-x2) * (y1-y3) - (y1-y2) * (x1-x3)) / d
+        
+        if t > 0 and t < 1 and u > 0:
+            x = x1 + t * (x2 - x1)
+            y = y1 + t * (y2 - y1)
+            return (x, y)
+        return False
+        
+                    
     def dev_mode_render(self):
         self.screen.fill((0, 0, 0))   
         self.dev_blit_walls()
@@ -166,12 +194,21 @@ class Game:
         self.dev_blit_rays()
         self.screen.blit(self.update_fps(), (10, 10))
     
-    
     def dev_blit_rays(self):
         for ray in self.player.rays:
-            ray = ray*self.render_distance
-            pygame.draw.line(self.screen, (0,0,255), (self.player.x, self.player.y), (ray[0] + self.player.x, ray[1] + self.player.y))
-        pygame.draw.line(self.screen, (255,0,0), (self.player.x, self.player.y), (-np.cos(self.player.r)*self.render_distance + self.player.x, -np.sin(self.player.r)*self.render_distance + self.player.y))
+            intersection_point = False
+            for wall in self.world.walls:
+                point = self.check_for_line_line_intersection((wall.A, wall.B), ((self.player.x, self.player.y), (ray.x * self.render_distance + self.player.x, ray.y * self.render_distance + self.player.y)))
+                if point is not False:
+                    if intersection_point is False:
+                        intersection_point = point
+                    elif self.line_length(((self.player.x, self.player.y), point)) < self.line_length(((self.player.x, self.player.y), intersection_point)):
+                        intersection_point = point
+                        
+            if intersection_point != False:
+                pygame.draw.line(self.screen, (0,0,255), (self.player.x, self.player.y), intersection_point)
+            else:
+                pygame.draw.line(self.screen, (0,0,255), (self.player.x, self.player.y), (ray.x * self.render_distance + self.player.x, ray.y * self.render_distance + self.player.y))
     
     def update_fps(self):
         fps = str(int(self.clock.get_fps()))
@@ -194,6 +231,12 @@ class Game:
         if v_l == 0:
             return 0, 0
         return x*r / v_l, y*r / v_l
+    
+    def line_length(self, line):
+        dx = line[0][0] - line[1][0]
+        dy = line[0][1] - line[1][1]
+        r = (dx ** 2 + dy ** 2) ** 0.5
+        return r
         
         
 
