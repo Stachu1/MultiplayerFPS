@@ -54,9 +54,9 @@ class Wall:
 class Game:
     def __init__(self):
         self.screen_size = (1200,800)
-        self.fov = 100
-        self.render_resolution = 31
-        self.render_distance = 1500
+        self.fov = 90
+        self.render_resolution = 120
+        self.render_distance = 2000
 
         
         pygame.init()
@@ -67,7 +67,7 @@ class Game:
 
         self.font = pygame.font.SysFont("Arial", 18)
         
-        self.player = Player(0, 500, 500)
+        self.player = Player(0, 1000, 300)
         
         self.enemy_list = []
         self.enemy_list.append(Player(0, 800, 500))
@@ -81,6 +81,8 @@ class Game:
         self.w_pressed = False
         self.s_pressed = False
         self.mouse_button = False
+        self.left_pressed = False
+        self.right_pressed = False
         self.speed = 4
         
 
@@ -90,11 +92,12 @@ class Game:
         while self.running:
             self.update_keyboard()
             self.mouse_x, self.mouse_y = pygame.mouse.get_pos()
-            self.player.r = np.arctan2(self.player.y-self.mouse_y, self.player.x-self.mouse_x)
+            # self.player.r = np.arctan2(self.player.y-self.mouse_y, self.player.x-self.mouse_x)
             
-                
+            
             self.update_player()
-            self.dev_mode_render()
+            self.render_frame()
+            # self.dev_mode_render()
             
             pygame.display.flip()
             self.clock.tick(60)
@@ -106,23 +109,34 @@ class Game:
         self.player.rays = self.player.generate_rays(self.fov, self.render_resolution)
         self.Vx = 0
         self.Vy = 0
-        if self.a_pressed and not self.d_pressed and self.player.x >= 0:
+        if self.a_pressed and not self.d_pressed:
             self.Vx = -self.speed
-        if self.d_pressed and not self.a_pressed and self.player.x <= self.screen.get_width():
+        if self.d_pressed and not self.a_pressed:
             self.Vx = self.speed
-        if self.w_pressed and not self.s_pressed and self.player.y >= 0:
+        if self.w_pressed and not self.s_pressed:
             self.Vy = -self.speed
-        if self.s_pressed and not self.w_pressed and self.player.y <= self.screen.get_height():
+        if self.s_pressed and not self.w_pressed:
             self.Vy = self.speed
-        if self.w_pressed and self.d_pressed and self.player.y >= 0 and self.player.x <= self.screen.get_width():
+        if self.w_pressed and self.d_pressed:
             self.Vx, self.Vy = self.vectro_scale(self.speed, -self.speed, self.speed)
-        if self.s_pressed and self.d_pressed and self.player.y <= self.screen.get_height() and self.player.x <= self.screen.get_width():
+        if self.s_pressed and self.d_pressed:
             self.Vx, self.Vy = self.vectro_scale(self.speed, self.speed, self.speed)
-        if self.s_pressed and self.a_pressed and self.player.y <= self.screen.get_height() and self.player.x >= 0:
+        if self.s_pressed and self.a_pressed:
             self.Vx, self.Vy = self.vectro_scale(-self.speed, self.speed, self.speed)
-        if self.w_pressed and self.a_pressed and self.player.y >= 0 and self.player.x >= 0:
+        if self.w_pressed and self.a_pressed:
             self.Vx, self.Vy = self.vectro_scale(-self.speed, -self.speed, self.speed)
-
+        
+        if self.left_pressed and not self.right_pressed:
+            self.player.r = self.player.r - 0.05
+        if self.right_pressed and not self.left_pressed:
+            self.player.r = self.player.r + 0.05
+            
+        _Vx = self.Vx*np.cos(self.player.r - np.pi/2) - self.Vy*np.sin(self.player.r - np.pi/2)
+        _Vy = self.Vy*np.cos(self.player.r - np.pi/2) + self.Vx*np.sin(self.player.r - np.pi/2)
+        
+        self.Vx = _Vx
+        self.Vy = _Vy
+        
         self.player.x += self.Vx
         self.player.y += self.Vy
     
@@ -146,6 +160,10 @@ class Game:
                         self.w_pressed = True
                     if event.key == pygame.K_s:
                         self.s_pressed = True
+                    if event.key == pygame.K_LEFT:
+                        self.left_pressed = True
+                    if event.key == pygame.K_RIGHT:
+                        self.right_pressed = True
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_a:
                         self.a_pressed = False
@@ -155,12 +173,49 @@ class Game:
                         self.w_pressed = False
                     if event.key == pygame.K_s:
                         self.s_pressed = False
+                    if event.key == pygame.K_LEFT:
+                        self.left_pressed = False
+                    if event.key == pygame.K_RIGHT:
+                        self.right_pressed = False
                 if pygame.mouse.get_pressed()[0]:
                     self.mouse_button = True
                 else:
                     self.mouse_button = False
     
     
+    def render_frame(self):
+        self.screen.fill((0,0,0))
+        self.screen.fill((0,0,255), (0, self.screen_size[1]//2, self.screen_size[0], self.screen_size[1]//2))
+        ray_lenghts = self.get_ray_lenghts()
+        line_width = self.screen_size[0] / self.render_resolution
+        for index, value in enumerate(ray_lenghts):
+            line_height = int(self.map(value, 0, self.render_distance, self.screen_size[1], 0))
+            brightness = line_height / self.screen_size[1]
+            rect = pygame.Rect(line_width * index, (self.screen_size[1] - line_height) // 2, line_width, line_height)
+            pygame.draw.rect(self.screen, np.array((255,255,255))*brightness, rect)
+        self.screen.blit(self.update_fps(), (10, 10))
+    
+    
+    def get_ray_lenghts(self):
+        ray_lenghts = []
+        for ray in self.player.rays:
+            intersection_point = False
+            for wall in self.world.walls:
+                point = self.check_for_line_line_intersection((wall.A, wall.B), ((self.player.x, self.player.y), (ray.x * self.render_distance + self.player.x, ray.y * self.render_distance + self.player.y)))
+                if point is not False:
+                    if intersection_point is False:
+                        intersection_point = point
+                    elif self.get_distance((self.player.x, self.player.y), point) < self.get_distance((self.player.x, self.player.y), intersection_point):
+                        intersection_point = point
+            if intersection_point is not False:
+                ray_lenght = self.get_distance((self.player.x, self.player.y), intersection_point)
+                if ray_lenght <= self.render_distance:
+                    ray_lenghts.append(self.get_distance((self.player.x, self.player.y), intersection_point))
+                else:
+                    ray_lenghts.append(self.render_distance)
+            else:
+                ray_lenghts.append(self.render_distance)
+        return ray_lenghts
     
     
     def check_for_line_line_intersection(self, line1, line2):
@@ -184,14 +239,13 @@ class Game:
             x = x1 + t * (x2 - x1)
             y = y1 + t * (y2 - y1)
             return (x, y)
-        return False
-        
+        return False    
                     
     def dev_mode_render(self):
         self.screen.fill((0, 0, 0))   
         self.dev_blit_walls()
-        self.dev_blit_players()
         self.dev_blit_rays()
+        self.dev_blit_players()
         self.screen.blit(self.update_fps(), (10, 10))
     
     def dev_blit_rays(self):
@@ -201,8 +255,9 @@ class Game:
                 point = self.check_for_line_line_intersection((wall.A, wall.B), ((self.player.x, self.player.y), (ray.x * self.render_distance + self.player.x, ray.y * self.render_distance + self.player.y)))
                 if point is not False:
                     if intersection_point is False:
-                        intersection_point = point
-                    elif self.line_length(((self.player.x, self.player.y), point)) < self.line_length(((self.player.x, self.player.y), intersection_point)):
+                        if self.get_distance((self.player.x, self.player.y), point) < self.render_distance:
+                            intersection_point = point
+                    elif self.get_distance((self.player.x, self.player.y), point) < self.get_distance((self.player.x, self.player.y), intersection_point):
                         intersection_point = point
                         
             if intersection_point != False:
@@ -232,12 +287,17 @@ class Game:
             return 0, 0
         return x*r / v_l, y*r / v_l
     
-    def line_length(self, line):
-        dx = line[0][0] - line[1][0]
-        dy = line[0][1] - line[1][1]
-        r = (dx ** 2 + dy ** 2) ** 0.5
-        return r
+    def get_distance(self, p1, p2, sqrt=True):
+        d = np.power(np.subtract(p1[0], p2[0]), 2) + np.power(np.subtract(p1[1], p2[1]), 2)
+        if sqrt:
+            d = np.sqrt(d)
+        return d
         
+    def map(self, v, fromMin, fromMax, toMin, toMax):
+        fromSpan = fromMax - fromMin
+        toSpan = toMax - toMin
+        valueScaled = float(v - fromMin) / float(fromSpan)
+        return toMin + (valueScaled * toSpan)
         
 
 
