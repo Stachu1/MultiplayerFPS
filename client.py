@@ -1,6 +1,6 @@
 from os import environ
 environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
-import time, os, numpy as np, random, sys, copy, pygame, pickle
+import time, os, numpy as np, random, sys, copy, pygame, pickle, pyautogui
 from PIL import Image, ImageDraw
 from struct import unpack
 from colorama import Fore, init
@@ -22,10 +22,18 @@ class Player:
     def generate_rays(self, fov, resolution):
         fov = np.deg2rad(fov)
         rays = []
-        ray2ray_angle = fov/(resolution - 1)
+        # ray2ray_angle = fov/(resolution - 1)
+        # for ray_id in range(resolution):
+        #     a = (self.r - fov / 2) + ray2ray_angle * ray_id
+        #     rays.append(Ray(-np.cos(a), -np.sin(a)))
         for ray_id in range(resolution):
-            a = (self.r - fov / 2) + ray2ray_angle * ray_id
-            rays.append(Ray(-np.cos(a), -np.sin(a)))
+            x = (resolution - ray_id) / resolution
+            y = 1
+            length = np.hypot(x, y)
+            if length != 0:
+                x /= length
+                y /= length
+            rays.append(Ray(x, y))
         return rays
 
 
@@ -36,8 +44,20 @@ class Ray:
 
 
 class World:
-    def __init__(self):
+    def __init__(self, filename):
         self.walls = [Wall(100, 100, 100, 400), Wall(100,400, 600,400), Wall(200,200, 300, 300)]
+        # self.load(filename)
+    
+    def load(self, filename):
+        img = np.array(Image.open(filename))
+        for line_index, line in enumerate(img):
+            for pixel_index, pixel in enumerate(line):
+                if pixel[0] == 0:
+                    self.walls.append(Wall(pixel_index*10, line_index*10, pixel_index*10 + 10, line_index*10))
+                    self.walls.append(Wall(pixel_index*10 + 10, line_index*10, pixel_index*10 + 10, line_index*10 + 10))
+                    self.walls.append(Wall(pixel_index*10 + 10, line_index*10 + 10, pixel_index*10, line_index*10 + 10))
+                    self.walls.append(Wall(pixel_index*10, line_index*10 + 10, pixel_index*10, line_index*10))
+                    
 
 
 class Wall:
@@ -50,30 +70,29 @@ class Wall:
         self.B = (x2, y2)
 
 
-
 class Game:
     def __init__(self):
         self.screen_size = (1200,800)
         self.fov = 90
-        self.render_resolution = 120
-        self.render_distance = 2000
+        self.render_resolution = 240
+        self.render_distance = 1000
+        self.map_filename = "map.jpg"
 
         
         pygame.init()
         self.clock = pygame.time.Clock()
         pygame.display.set_caption("FPS client")
-        # self.screen = pygame.display.set_mode(self.screen_size, pygame.FULLSCREEN)
+        # self.screen = pygame.display.set_mode((1440,900), pygame.FULLSCREEN)
         self.screen = pygame.display.set_mode(self.screen_size)
 
         self.font = pygame.font.SysFont("Arial", 18)
         
-        self.player = Player(0, 1000, 300)
+        self.player = Player(0, 300, 300)
         
         self.enemy_list = []
         self.enemy_list.append(Player(0, 800, 500))
         
-        self.world = World()
-        
+        self.world = World(self.map_filename)
         
         
         self.a_pressed = False
@@ -94,7 +113,6 @@ class Game:
             self.mouse_x, self.mouse_y = pygame.mouse.get_pos()
             # self.player.r = np.arctan2(self.player.y-self.mouse_y, self.player.x-self.mouse_x)
             
-            
             self.update_player()
             self.render_frame()
             # self.dev_mode_render()
@@ -102,7 +120,6 @@ class Game:
             pygame.display.flip()
             self.clock.tick(60)
         return False
-    
     
     
     def update_player(self):
@@ -184,15 +201,18 @@ class Game:
     
     
     def render_frame(self):
-        self.screen.fill((0,0,0))
-        self.screen.fill((0,0,255), (0, self.screen_size[1]//2, self.screen_size[0], self.screen_size[1]//2))
+        self.screen.fill((100,120,100))
+        self.screen.fill((215,180,130), (0, self.screen_size[1]//2, self.screen_size[0], self.screen_size[1]//2))
         ray_lenghts = self.get_ray_lenghts()
         line_width = self.screen_size[0] / self.render_resolution
+        ray2ray_angle = np.deg2rad(self.fov)/(self.render_resolution - 1)
         for index, value in enumerate(ray_lenghts):
-            line_height = int(self.map(value, 0, self.render_distance, self.screen_size[1], 0))
-            brightness = line_height / self.screen_size[1]
-            rect = pygame.Rect(line_width * index, (self.screen_size[1] - line_height) // 2, line_width, line_height)
-            pygame.draw.rect(self.screen, np.array((255,255,255))*brightness, rect)
+            if value < self.render_distance:
+                adjacent_distance = value * np.cos(ray2ray_angle * abs(index - len(ray_lenghts)/2))
+                line_height = int(self.map(adjacent_distance, 0, self.render_distance, self.screen_size[1], 0))
+                brightness = line_height / self.screen_size[1]
+                rect = pygame.Rect(line_width * index, (self.screen_size[1] - line_height) // 2, line_width, line_height)
+                pygame.draw.rect(self.screen, np.array((255,255,255))*brightness, rect)
         self.screen.blit(self.update_fps(), (10, 10))
     
     
@@ -265,6 +285,7 @@ class Game:
             else:
                 pygame.draw.line(self.screen, (0,0,255), (self.player.x, self.player.y), (ray.x * self.render_distance + self.player.x, ray.y * self.render_distance + self.player.y))
     
+    
     def update_fps(self):
         fps = str(int(self.clock.get_fps()))
         fps_text = self.font.render(f"FPS: {fps}", 1, pygame.Color("white"))
@@ -273,7 +294,7 @@ class Game:
     def dev_blit_players(self):
         pygame.draw.circle(self.screen, (0,255,0), (self.player.x, self.player.y), 10, 10)
         for enemy in self.enemy_list:
-            pygame.draw.circle(self.screen, (255,0,0), (enemy.x, enemy.y), 10, 10)
+            pygame.draw.circle(self.screen, (255,0,0), (enemy.x, enemy.y), 5, 5)
         return True
     
     def dev_blit_walls(self):
