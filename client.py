@@ -11,7 +11,7 @@ class Player:
         self.x = x
         self.y = y
         self.angle = angle  # Player's viewing angle in radians
-        self.speed = 0.1
+        self.speed = 0.05
         self.rotation_speed = 0.05
         
     def move_forward(self):
@@ -58,12 +58,11 @@ class World:
             [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
             [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
         ]
-        self.cell_size = 1  # Size of each grid cell in pixels
     
     def is_wall(self, x, y):
         # Convert world coordinates to grid coordinates
-        grid_x = int(x // self.cell_size)
-        grid_y = int(y // self.cell_size)
+        grid_x = int(x)
+        grid_y = int(y)
         
         # Check bounds
         if grid_x < 0 or grid_x >= len(self.grid[0]) or grid_y < 0 or grid_y >= len(self.grid):
@@ -77,42 +76,49 @@ class Renderer:
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.fov = math.pi / 3  # 60 degrees field of view
-        self.num_rays = screen_width // 2  # Ray resolution
+        self.num_rays = screen_width // 20  # Ray resolution
         self.max_depth = 15  # Maximum render distance
+        self.distance_resolution = 0.01
+        self.background = pygame.transform.scale(pygame.image.load("background.png"), (self.screen_width, self.screen_height))
         
     def cast_ray(self, world, start_x, start_y, angle):
         # Ray casting using DDA algorithm
         sin_a = math.sin(angle)
         cos_a = math.cos(angle)
         
-        for depth in range(0, self.max_depth, 2):
-            target_x = start_x + depth * cos_a
-            target_y = start_y + depth * sin_a
+        for depth in range(0, int(self.max_depth / self.distance_resolution)):
+            target_x = start_x + depth * cos_a * self.distance_resolution
+            target_y = start_y + depth * sin_a * self.distance_resolution
             
             if world.is_wall(target_x, target_y):
-                return depth
+                return depth * self.distance_resolution, target_x, target_y
         
-        return self.max_depth
+        # Return max depth with end position
+        end_x = start_x + self.max_depth * cos_a
+        end_y = start_y + self.max_depth * sin_a
+        return self.max_depth, end_x, end_y
     
     def render_3d(self, screen, player, world):
         # Clear screen
-        screen.fill((0, 0, 0))
-        
-        # Draw sky
-        sky_color = (135, 206, 235)  # Light blue
-        pygame.draw.rect(screen, sky_color, (0, 0, self.screen_width, self.screen_height // 2))
-        
-        # Draw floor
-        floor_color = (34, 139, 34)  # Forest green
-        pygame.draw.rect(screen, floor_color, (0, self.screen_height // 2, self.screen_width, self.screen_height // 2))
+        screen.blit(self.background, (0, 0))
         
         # Cast rays and draw walls
+        self.ray_data = []  # Store ray data for debug rendering
+        
         for ray_id in range(self.num_rays):
             # Calculate ray angle
             ray_angle = player.angle - self.fov / 2 + (ray_id / self.num_rays) * self.fov
             
             # Cast ray
-            distance = self.cast_ray(world, player.x, player.y, ray_angle)
+            distance, hit_x, hit_y = self.cast_ray(world, player.x, player.y, ray_angle)
+            
+            # Store ray data for debug view
+            self.ray_data.append({
+                'angle': ray_angle,
+                'distance': distance,
+                'hit_x': hit_x,
+                'hit_y': hit_y
+            })
             
             # Fix fisheye effect
             distance *= math.cos(ray_angle - player.angle)
@@ -130,14 +136,59 @@ class Renderer:
             wall_width = self.screen_width / self.num_rays + 1
             
             pygame.draw.rect(screen, wall_color, (wall_x, wall_y, wall_width, wall_height))
+    
+    def render_debug_topdown(self, screen, player, world, debug_size=200):
+        # Draw debug view in top-right corner
+        debug_x = self.screen_width - debug_size - 10
+        debug_y = 10
+        
+        # Scale factor to fit the world in the debug view
+        scale = debug_size / 16  # 16 is the grid size
+        
+        # Draw debug background
+        pygame.draw.rect(screen, (50, 50, 50), (debug_x, debug_y, debug_size, debug_size))
+        pygame.draw.rect(screen, (100, 100, 100), (debug_x, debug_y, debug_size, debug_size), 2)
+        
+        # Draw grid and walls
+        for y in range(len(world.grid)):
+            for x in range(len(world.grid[0])):
+                if world.grid[y][x] == 1:  # Wall
+                    wall_rect = pygame.Rect(
+                        debug_x + x * scale,
+                        debug_y + y * scale,
+                        scale,
+                        scale
+                    )
+                    pygame.draw.rect(screen, (255, 255, 255), wall_rect)
+        
+        # Draw player
+        player_debug_x = debug_x + player.x * scale
+        player_debug_y = debug_y + player.y * scale
+        pygame.draw.circle(screen, (0, 255, 0), (int(player_debug_x), int(player_debug_y)), 3)
+        
+        # Draw player direction
+        dir_end_x = player_debug_x + math.cos(player.angle) * 20
+        dir_end_y = player_debug_y + math.sin(player.angle) * 20
+        pygame.draw.line(screen, (0, 255, 0), (player_debug_x, player_debug_y), (dir_end_x, dir_end_y), 2)
+        
+        # Draw rays if we have ray data
+        if hasattr(self, 'ray_data'):
+            for ray in self.ray_data:
+                # Draw ray line
+                ray_end_x = debug_x + ray['hit_x'] * scale
+                ray_end_y = debug_y + ray['hit_y'] * scale
+                pygame.draw.line(screen, (0, 0, 255), (player_debug_x, player_debug_y), (ray_end_x, ray_end_y), 1)
+                
+                # Draw hit point
+                pygame.draw.circle(screen, (255, 0, 0), (int(ray_end_x), int(ray_end_y)), 2)
 
 
 class Game:
     def __init__(self):
         pygame.init()
         self.screen_width = 800
-        self.screen_height = 600
-        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+        self.screen_height = 450
+        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.DOUBLEBUF | pygame.HWSURFACE)
         pygame.display.set_caption("MultiplayerFPS")
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("Arial", 18)
@@ -227,10 +278,17 @@ class Game:
     def render(self):
         self.renderer.render_3d(self.screen, self.player, self.world)
         
+        # Draw debug top-down view
+        self.renderer.render_debug_topdown(self.screen, self.player, self.world)
+        
         # Draw FPS
         fps = str(int(self.clock.get_fps()))
-        fps_text = self.font.render(f"FPS: {fps}", True, pygame.Color("white"))
+        fps_text = self.font.render(f"FPS: {fps}", True, (255, 0, 0))
         self.screen.blit(fps_text, (10, 10))
+        
+        # Draw position debug info
+        pos_text = self.font.render(f"x: {self.player.x:.2f} y: {self.player.y:.2f}", True, (0, 255, 255))
+        self.screen.blit(pos_text, (10, 30))
         
         pygame.display.flip()
     
@@ -240,8 +298,8 @@ class Game:
             self.handle_input()
             self.update()
             self.render()
-            print(self.player.x, self.player.y, self.player.angle)
-            self.clock.tick(60)  # 60 FPS
+            # print(f"x: {self.player.x:.2f} y: {self.player.y:.2f} {self.player.angle*180/math.pi:.1f}°")
+            self.clock.tick(62)  # 60 FPS
         
         pygame.quit()
 
