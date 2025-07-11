@@ -12,22 +12,6 @@ class Player:
         self.angle = angle  # Player's viewing angle in radians
         self.speed = 0.05
         self.rotation_speed = 0.05
-        
-    def move_forward(self, speed_sacle=1):
-        self.x += np.cos(self.angle) * self.speed * speed_sacle
-        self.y += np.sin(self.angle) * self.speed * speed_sacle
-    
-    def move_backward(self, speed_sacle=1):
-        self.x -= np.cos(self.angle) * self.speed * speed_sacle
-        self.y -= np.sin(self.angle) * self.speed * speed_sacle
-    
-    def move_left(self, speed_sacle=1):
-        self.x += np.cos(self.angle - np.pi/2) * self.speed * speed_sacle
-        self.y += np.sin(self.angle - np.pi/2) * self.speed * speed_sacle
-    
-    def move_right(self, speed_sacle=1):
-        self.x += np.cos(self.angle + np.pi/2) * self.speed * speed_sacle
-        self.y += np.sin(self.angle + np.pi/2) * self.speed * speed_sacle
     
     def rotate_left(self):
         self.angle -= self.rotation_speed
@@ -258,15 +242,22 @@ class Game:
         
         speed_sacle = 60 / self.clock.get_fps() if self.clock.get_fps() > 0 else 1
         
+        # Calculate movement deltas
+        dx, dy = 0, 0
+        
         # Handle movement
         if self.keys_pressed['w']:
-            self.player.move_forward(speed_sacle)
+            dx += np.cos(self.player.angle) * self.player.speed * speed_sacle
+            dy += np.sin(self.player.angle) * self.player.speed * speed_sacle
         if self.keys_pressed['s']:
-            self.player.move_backward(speed_sacle)
+            dx -= np.cos(self.player.angle) * self.player.speed * speed_sacle
+            dy -= np.sin(self.player.angle) * self.player.speed * speed_sacle
         if self.keys_pressed['a']:
-            self.player.move_left(speed_sacle)
+            dx += np.cos(self.player.angle - np.pi/2) * self.player.speed * speed_sacle
+            dy += np.sin(self.player.angle - np.pi/2) * self.player.speed * speed_sacle
         if self.keys_pressed['d']:
-            self.player.move_right(speed_sacle)
+            dx += np.cos(self.player.angle + np.pi/2) * self.player.speed * speed_sacle
+            dy += np.sin(self.player.angle + np.pi/2) * self.player.speed * speed_sacle
         
         # Handle rotation (arrow keys)
         if self.keys_pressed['left']:
@@ -274,9 +265,16 @@ class Game:
         if self.keys_pressed['right']:
             self.player.rotate_right()
         
-        # Simple collision detection
+        # Wall sliding collision detection
+        # Try moving on X axis first
+        self.player.x += dx
         if self.world.is_wall(self.player.x, self.player.y):
-            self.player.x, self.player.y = old_x, old_y
+            self.player.x = old_x  # Revert X movement if hitting wall
+        
+        # Then try moving on Y axis
+        self.player.y += dy
+        if self.world.is_wall(self.player.x, self.player.y):
+            self.player.y = old_y  # Revert Y movement if hitting wall
     
     def render(self):
         self.engine.render(self.screen, self.player, self.world)
