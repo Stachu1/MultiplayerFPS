@@ -3,7 +3,6 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 import time
 import numpy as np
 import pygame
-import math
 
 
 class Player:
@@ -14,21 +13,21 @@ class Player:
         self.speed = 0.05
         self.rotation_speed = 0.05
         
-    def move_forward(self):
-        self.x += math.cos(self.angle) * self.speed
-        self.y += math.sin(self.angle) * self.speed
+    def move_forward(self, speed_sacle=1):
+        self.x += np.cos(self.angle) * self.speed * speed_sacle
+        self.y += np.sin(self.angle) * self.speed * speed_sacle
     
-    def move_backward(self):
-        self.x -= math.cos(self.angle) * self.speed
-        self.y -= math.sin(self.angle) * self.speed
+    def move_backward(self, speed_sacle=1):
+        self.x -= np.cos(self.angle) * self.speed * speed_sacle
+        self.y -= np.sin(self.angle) * self.speed * speed_sacle
     
-    def strafe_left(self):
-        self.x += math.cos(self.angle - math.pi/2) * self.speed
-        self.y += math.sin(self.angle - math.pi/2) * self.speed
+    def move_left(self, speed_sacle=1):
+        self.x += np.cos(self.angle - np.pi/2) * self.speed * speed_sacle
+        self.y += np.sin(self.angle - np.pi/2) * self.speed * speed_sacle
     
-    def strafe_right(self):
-        self.x += math.cos(self.angle + math.pi/2) * self.speed
-        self.y += math.sin(self.angle + math.pi/2) * self.speed
+    def move_right(self, speed_sacle=1):
+        self.x += np.cos(self.angle + np.pi/2) * self.speed * speed_sacle
+        self.y += np.sin(self.angle + np.pi/2) * self.speed * speed_sacle
     
     def rotate_left(self):
         self.angle -= self.rotation_speed
@@ -71,20 +70,21 @@ class World:
         return self.grid[grid_y][grid_x] == 1
 
 
-class Renderer:
+class Engine:
     def __init__(self, screen_width, screen_height):
         self.screen_width = screen_width
         self.screen_height = screen_height
-        self.fov = math.pi / 3  # 60 degrees field of view
-        self.num_rays = screen_width // 20  # Ray resolution
+        self.fov = np.pi / 3  # 60 degrees field of view
+        self.num_rays = screen_width // 10  # Ray resolution
         self.max_depth = 15  # Maximum render distance
-        self.distance_resolution = 0.01
+        self.distance_resolution = 0.1
+        self.height_scale = 3
         self.background = pygame.transform.scale(pygame.image.load("background.png"), (self.screen_width, self.screen_height))
         
     def cast_ray(self, world, start_x, start_y, angle):
         # Ray casting using DDA algorithm
-        sin_a = math.sin(angle)
-        cos_a = math.cos(angle)
+        sin_a = np.sin(angle)
+        cos_a = np.cos(angle)
         
         for depth in range(0, int(self.max_depth / self.distance_resolution)):
             target_x = start_x + depth * cos_a * self.distance_resolution
@@ -98,7 +98,7 @@ class Renderer:
         end_y = start_y + self.max_depth * sin_a
         return self.max_depth, end_x, end_y
     
-    def render_3d(self, screen, player, world):
+    def render(self, screen, player, world):
         # Clear screen
         screen.blit(self.background, (0, 0))
         
@@ -121,13 +121,13 @@ class Renderer:
             })
             
             # Fix fisheye effect
-            distance *= math.cos(ray_angle - player.angle)
+            distance *= np.cos(ray_angle - player.angle)
             
             # Calculate wall height
-            wall_height = min(self.screen_height, self.screen_height / (distance + 0.0001))
+            wall_height = min(self.screen_height, self.height_scale * self.screen_height / (distance + 0.0001))
             
             # Calculate wall color based on distance (darker = farther)
-            color_intensity = max(0.1, 1 - distance / self.max_depth)
+            color_intensity = max(0.05, 1 - distance / self.max_depth)
             wall_color = (int(255 * color_intensity), int(255 * color_intensity), int(255 * color_intensity))
             
             # Draw wall slice
@@ -137,7 +137,7 @@ class Renderer:
             
             pygame.draw.rect(screen, wall_color, (wall_x, wall_y, wall_width, wall_height))
     
-    def render_debug_topdown(self, screen, player, world, debug_size=200):
+    def render_debug(self, screen, player, world, debug_size=200):
         # Draw debug view in top-right corner
         debug_x = self.screen_width - debug_size - 10
         debug_y = 10
@@ -167,8 +167,8 @@ class Renderer:
         pygame.draw.circle(screen, (0, 255, 0), (int(player_debug_x), int(player_debug_y)), 3)
         
         # Draw player direction
-        dir_end_x = player_debug_x + math.cos(player.angle) * 20
-        dir_end_y = player_debug_y + math.sin(player.angle) * 20
+        dir_end_x = player_debug_x + np.cos(player.angle) * 20
+        dir_end_y = player_debug_y + np.sin(player.angle) * 20
         pygame.draw.line(screen, (0, 255, 0), (player_debug_x, player_debug_y), (dir_end_x, dir_end_y), 2)
         
         # Draw rays if we have ray data
@@ -188,15 +188,16 @@ class Game:
         pygame.init()
         self.screen_width = 800
         self.screen_height = 450
+        self.fps_target = 60
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.DOUBLEBUF | pygame.HWSURFACE)
         pygame.display.set_caption("MultiplayerFPS")
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("Arial", 18)
         
         # Initialize game objects
-        self.player = Player(1, 1, 0)  # Start player at position (200, 200)
+        self.player = Player(1, 1, 0)
         self.world = World()
-        self.renderer = Renderer(self.screen_width, self.screen_height)
+        self.engine = Engine(self.screen_width, self.screen_height)
         
         # Input state
         self.keys_pressed = {
@@ -255,15 +256,17 @@ class Game:
         # Store old position for collision detection
         old_x, old_y = self.player.x, self.player.y
         
+        speed_sacle = 60 / self.clock.get_fps() if self.clock.get_fps() > 0 else 1
+        
         # Handle movement
         if self.keys_pressed['w']:
-            self.player.move_forward()
+            self.player.move_forward(speed_sacle)
         if self.keys_pressed['s']:
-            self.player.move_backward()
+            self.player.move_backward(speed_sacle)
         if self.keys_pressed['a']:
-            self.player.strafe_left()
+            self.player.move_left(speed_sacle)
         if self.keys_pressed['d']:
-            self.player.strafe_right()
+            self.player.move_right(speed_sacle)
         
         # Handle rotation (arrow keys)
         if self.keys_pressed['left']:
@@ -276,10 +279,10 @@ class Game:
             self.player.x, self.player.y = old_x, old_y
     
     def render(self):
-        self.renderer.render_3d(self.screen, self.player, self.world)
+        self.engine.render(self.screen, self.player, self.world)
         
         # Draw debug top-down view
-        self.renderer.render_debug_topdown(self.screen, self.player, self.world)
+        self.engine.render_debug(self.screen, self.player, self.world)
         
         # Draw FPS
         fps = str(int(self.clock.get_fps()))
@@ -298,8 +301,8 @@ class Game:
             self.handle_input()
             self.update()
             self.render()
-            # print(f"x: {self.player.x:.2f} y: {self.player.y:.2f} {self.player.angle*180/math.pi:.1f}°")
-            self.clock.tick(62)  # 60 FPS
+            # self.clock.tick(self.fps_target)
+            self.clock.tick()
         
         pygame.quit()
 
