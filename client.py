@@ -1,326 +1,251 @@
-from os import environ
-environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
-import time, os, numpy as np, random, sys, copy, pygame, pickle, pyautogui
-from PIL import Image, ImageDraw
-from struct import unpack
-from colorama import Fore, init
-init()
-
-
+import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+import time
+import numpy as np
+import pygame
+import math
 
 
 class Player:
-    def __init__(self, id, x, y, r=0):
-        self.id = id
+    def __init__(self, x, y, angle=0):
         self.x = x
         self.y = y
-        self.r = r
-        self.Vx = 0
-        self.Vy = 0
-        self.size = 0.5
+        self.angle = angle  # Player's viewing angle in radians
+        self.speed = 0.1
+        self.rotation_speed = 0.05
+        
+    def move_forward(self):
+        self.x += math.cos(self.angle) * self.speed
+        self.y += math.sin(self.angle) * self.speed
     
-    def generate_rays(self, fov, resolution):
-        fov = np.deg2rad(fov)
-        rays = []
-        # ray2ray_angle = fov/(resolution - 1)
-        # for ray_id in range(resolution):
-        #     a = (self.r - fov / 2) + ray2ray_angle * ray_id
-        #     rays.append(Ray(-np.cos(a), -np.sin(a)))
-        for ray_id in range(resolution):
-            x = (resolution - ray_id) / resolution
-            y = 1
-            length = np.hypot(x, y)
-            if length != 0:
-                x /= length
-                y /= length
-            rays.append(Ray(x, y))
-        return rays
-
-
-class Ray:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
+    def move_backward(self):
+        self.x -= math.cos(self.angle) * self.speed
+        self.y -= math.sin(self.angle) * self.speed
+    
+    def strafe_left(self):
+        self.x += math.cos(self.angle - math.pi/2) * self.speed
+        self.y += math.sin(self.angle - math.pi/2) * self.speed
+    
+    def strafe_right(self):
+        self.x += math.cos(self.angle + math.pi/2) * self.speed
+        self.y += math.sin(self.angle + math.pi/2) * self.speed
+    
+    def rotate_left(self):
+        self.angle -= self.rotation_speed
+    
+    def rotate_right(self):
+        self.angle += self.rotation_speed
 
 
 class World:
-    def __init__(self, filename):
-        self.walls = [Wall(100, 100, 100, 400), Wall(100,400, 600,400), Wall(200,200, 300, 300)]
-        # self.load(filename)
+    def __init__(self):
+        # Simple grid-based map (1 = wall, 0 = empty space)
+        self.grid = [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,1,1,1,0,0,0,0,1,1,1,0,0,1],
+            [1,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1],
+            [1,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1],
+            [1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1],
+            [1,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1],
+            [1,0,0,1,1,1,0,0,0,0,1,1,1,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ]
+        self.cell_size = 1  # Size of each grid cell in pixels
     
-    def load(self, filename):
-        img = np.array(Image.open(filename))
-        for line_index, line in enumerate(img):
-            for pixel_index, pixel in enumerate(line):
-                if pixel[0] == 0:
-                    self.walls.append(Wall(pixel_index*10, line_index*10, pixel_index*10 + 10, line_index*10))
-                    self.walls.append(Wall(pixel_index*10 + 10, line_index*10, pixel_index*10 + 10, line_index*10 + 10))
-                    self.walls.append(Wall(pixel_index*10 + 10, line_index*10 + 10, pixel_index*10, line_index*10 + 10))
-                    self.walls.append(Wall(pixel_index*10, line_index*10 + 10, pixel_index*10, line_index*10))
-                    
+    def is_wall(self, x, y):
+        # Convert world coordinates to grid coordinates
+        grid_x = int(x // self.cell_size)
+        grid_y = int(y // self.cell_size)
+        
+        # Check bounds
+        if grid_x < 0 or grid_x >= len(self.grid[0]) or grid_y < 0 or grid_y >= len(self.grid):
+            return True  # Treat out of bounds as walls
+        
+        return self.grid[grid_y][grid_x] == 1
 
 
-class Wall:
-    def __init__(self, x1, y1, x2, y2):
-        self.x1 = x1
-        self.y1 = y1
-        self.x2 = x2
-        self.y2 = y2
-        self.A = (x1, y1)
-        self.B = (x2, y2)
+class Renderer:
+    def __init__(self, screen_width, screen_height):
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        self.fov = math.pi / 3  # 60 degrees field of view
+        self.num_rays = screen_width // 2  # Ray resolution
+        self.max_depth = 15  # Maximum render distance
+        
+    def cast_ray(self, world, start_x, start_y, angle):
+        # Ray casting using DDA algorithm
+        sin_a = math.sin(angle)
+        cos_a = math.cos(angle)
+        
+        for depth in range(0, self.max_depth, 2):
+            target_x = start_x + depth * cos_a
+            target_y = start_y + depth * sin_a
+            
+            if world.is_wall(target_x, target_y):
+                return depth
+        
+        return self.max_depth
+    
+    def render_3d(self, screen, player, world):
+        # Clear screen
+        screen.fill((0, 0, 0))
+        
+        # Draw sky
+        sky_color = (135, 206, 235)  # Light blue
+        pygame.draw.rect(screen, sky_color, (0, 0, self.screen_width, self.screen_height // 2))
+        
+        # Draw floor
+        floor_color = (34, 139, 34)  # Forest green
+        pygame.draw.rect(screen, floor_color, (0, self.screen_height // 2, self.screen_width, self.screen_height // 2))
+        
+        # Cast rays and draw walls
+        for ray_id in range(self.num_rays):
+            # Calculate ray angle
+            ray_angle = player.angle - self.fov / 2 + (ray_id / self.num_rays) * self.fov
+            
+            # Cast ray
+            distance = self.cast_ray(world, player.x, player.y, ray_angle)
+            
+            # Fix fisheye effect
+            distance *= math.cos(ray_angle - player.angle)
+            
+            # Calculate wall height
+            wall_height = min(self.screen_height, self.screen_height / (distance + 0.0001))
+            
+            # Calculate wall color based on distance (darker = farther)
+            color_intensity = max(0.1, 1 - distance / self.max_depth)
+            wall_color = (int(255 * color_intensity), int(255 * color_intensity), int(255 * color_intensity))
+            
+            # Draw wall slice
+            wall_x = ray_id * (self.screen_width / self.num_rays)
+            wall_y = (self.screen_height - wall_height) / 2
+            wall_width = self.screen_width / self.num_rays + 1
+            
+            pygame.draw.rect(screen, wall_color, (wall_x, wall_y, wall_width, wall_height))
 
 
 class Game:
     def __init__(self):
-        self.screen_size = (1200,800)
-        self.fov = 90
-        self.render_resolution = 240
-        self.render_distance = 1000
-        self.map_filename = "map.jpg"
-
-        
         pygame.init()
+        self.screen_width = 800
+        self.screen_height = 600
+        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+        pygame.display.set_caption("MultiplayerFPS")
         self.clock = pygame.time.Clock()
-        pygame.display.set_caption("FPS client")
-        # self.screen = pygame.display.set_mode((1440,900), pygame.FULLSCREEN)
-        self.screen = pygame.display.set_mode(self.screen_size)
-
         self.font = pygame.font.SysFont("Arial", 18)
         
-        self.player = Player(0, 300, 300)
+        # Initialize game objects
+        self.player = Player(1, 1, 0)  # Start player at position (200, 200)
+        self.world = World()
+        self.renderer = Renderer(self.screen_width, self.screen_height)
         
-        self.enemy_list = []
-        self.enemy_list.append(Player(0, 800, 500))
+        # Input state
+        self.keys_pressed = {
+            'w': False, 'a': False, 's': False, 'd': False,
+            'left': False, 'right': False
+        }
         
-        self.world = World(self.map_filename)
+        # Mouse settings
+        pygame.mouse.set_visible(False)
+        pygame.event.set_grab(True)
+        self.mouse_sensitivity = 0.002
         
+        self.running = True
+    
+    def handle_input(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+            
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.running = False
+                elif event.key == pygame.K_w:
+                    self.keys_pressed['w'] = True
+                elif event.key == pygame.K_a:
+                    self.keys_pressed['a'] = True
+                elif event.key == pygame.K_s:
+                    self.keys_pressed['s'] = True
+                elif event.key == pygame.K_d:
+                    self.keys_pressed['d'] = True
+                elif event.key == pygame.K_LEFT:
+                    self.keys_pressed['left'] = True
+                elif event.key == pygame.K_RIGHT:
+                    self.keys_pressed['right'] = True
+            
+            elif event.type == pygame.KEYUP:
+                if event.key == pygame.K_w:
+                    self.keys_pressed['w'] = False
+                elif event.key == pygame.K_a:
+                    self.keys_pressed['a'] = False
+                elif event.key == pygame.K_s:
+                    self.keys_pressed['s'] = False
+                elif event.key == pygame.K_d:
+                    self.keys_pressed['d'] = False
+                elif event.key == pygame.K_LEFT:
+                    self.keys_pressed['left'] = False
+                elif event.key == pygame.K_RIGHT:
+                    self.keys_pressed['right'] = False
+            
+            elif event.type == pygame.MOUSEMOTION:
+                # Mouse look
+                mouse_dx = event.rel[0]
+                self.player.angle += mouse_dx * self.mouse_sensitivity
+    
+    def update(self):
+        # Store old position for collision detection
+        old_x, old_y = self.player.x, self.player.y
         
-        self.a_pressed = False
-        self.d_pressed = False
-        self.w_pressed = False
-        self.s_pressed = False
-        self.mouse_button = False
-        self.left_pressed = False
-        self.right_pressed = False
-        self.speed = 4
+        # Handle movement
+        if self.keys_pressed['w']:
+            self.player.move_forward()
+        if self.keys_pressed['s']:
+            self.player.move_backward()
+        if self.keys_pressed['a']:
+            self.player.strafe_left()
+        if self.keys_pressed['d']:
+            self.player.strafe_right()
         
+        # Handle rotation (arrow keys)
+        if self.keys_pressed['left']:
+            self.player.rotate_left()
+        if self.keys_pressed['right']:
+            self.player.rotate_right()
+        
+        # Simple collision detection
+        if self.world.is_wall(self.player.x, self.player.y):
+            self.player.x, self.player.y = old_x, old_y
+    
+    def render(self):
+        self.renderer.render_3d(self.screen, self.player, self.world)
+        
+        # Draw FPS
+        fps = str(int(self.clock.get_fps()))
+        fps_text = self.font.render(f"FPS: {fps}", True, pygame.Color("white"))
+        self.screen.blit(fps_text, (10, 10))
+        
+        pygame.display.flip()
+    
 
     def run(self):
-        self.running = True
-        
         while self.running:
-            self.update_keyboard()
-            self.mouse_x, self.mouse_y = pygame.mouse.get_pos()
-            # self.player.r = np.arctan2(self.player.y-self.mouse_y, self.player.x-self.mouse_x)
-            
-            self.update_player()
-            self.render_frame()
-            # self.dev_mode_render()
-            
-            pygame.display.flip()
-            self.clock.tick(60)
-        return False
-    
-    
-    def update_player(self):
-        self.player.rays = self.player.generate_rays(self.fov, self.render_resolution)
-        self.Vx = 0
-        self.Vy = 0
-        if self.a_pressed and not self.d_pressed:
-            self.Vx = -self.speed
-        if self.d_pressed and not self.a_pressed:
-            self.Vx = self.speed
-        if self.w_pressed and not self.s_pressed:
-            self.Vy = -self.speed
-        if self.s_pressed and not self.w_pressed:
-            self.Vy = self.speed
-        if self.w_pressed and self.d_pressed:
-            self.Vx, self.Vy = self.vectro_scale(self.speed, -self.speed, self.speed)
-        if self.s_pressed and self.d_pressed:
-            self.Vx, self.Vy = self.vectro_scale(self.speed, self.speed, self.speed)
-        if self.s_pressed and self.a_pressed:
-            self.Vx, self.Vy = self.vectro_scale(-self.speed, self.speed, self.speed)
-        if self.w_pressed and self.a_pressed:
-            self.Vx, self.Vy = self.vectro_scale(-self.speed, -self.speed, self.speed)
+            self.handle_input()
+            self.update()
+            self.render()
+            print(self.player.x, self.player.y, self.player.angle)
+            self.clock.tick(60)  # 60 FPS
         
-        if self.left_pressed and not self.right_pressed:
-            self.player.r = self.player.r - 0.05
-        if self.right_pressed and not self.left_pressed:
-            self.player.r = self.player.r + 0.05
-            
-        _Vx = self.Vx*np.cos(self.player.r - np.pi/2) - self.Vy*np.sin(self.player.r - np.pi/2)
-        _Vy = self.Vy*np.cos(self.player.r - np.pi/2) + self.Vx*np.sin(self.player.r - np.pi/2)
-        
-        self.Vx = _Vx
-        self.Vy = _Vy
-        
-        self.player.x += self.Vx
-        self.player.y += self.Vy
-    
-    
-    def update_keyboard(self):
-        for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                    pygame.quit()
-                    exit()
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        self.running = False
-                        pygame.quit()
-                        exit()
-                    if event.key == pygame.K_a:
-                        self.a_pressed = True
-                    if event.key == pygame.K_d:
-                        self.d_pressed = True
-                    if event.key == pygame.K_w:
-                        self.w_pressed = True
-                    if event.key == pygame.K_s:
-                        self.s_pressed = True
-                    if event.key == pygame.K_LEFT:
-                        self.left_pressed = True
-                    if event.key == pygame.K_RIGHT:
-                        self.right_pressed = True
-                if event.type == pygame.KEYUP:
-                    if event.key == pygame.K_a:
-                        self.a_pressed = False
-                    if event.key == pygame.K_d:
-                        self.d_pressed = False
-                    if event.key == pygame.K_w:
-                        self.w_pressed = False
-                    if event.key == pygame.K_s:
-                        self.s_pressed = False
-                    if event.key == pygame.K_LEFT:
-                        self.left_pressed = False
-                    if event.key == pygame.K_RIGHT:
-                        self.right_pressed = False
-                if pygame.mouse.get_pressed()[0]:
-                    self.mouse_button = True
-                else:
-                    self.mouse_button = False
-    
-    
-    def render_frame(self):
-        self.screen.fill((100,120,100))
-        self.screen.fill((215,180,130), (0, self.screen_size[1]//2, self.screen_size[0], self.screen_size[1]//2))
-        ray_lenghts = self.get_ray_lenghts()
-        line_width = self.screen_size[0] / self.render_resolution
-        ray2ray_angle = np.deg2rad(self.fov)/(self.render_resolution - 1)
-        for index, value in enumerate(ray_lenghts):
-            if value < self.render_distance:
-                adjacent_distance = value * np.cos(ray2ray_angle * abs(index - len(ray_lenghts)/2))
-                line_height = int(self.map(adjacent_distance, 0, self.render_distance, self.screen_size[1], 0))
-                brightness = line_height / self.screen_size[1]
-                rect = pygame.Rect(line_width * index, (self.screen_size[1] - line_height) // 2, line_width, line_height)
-                pygame.draw.rect(self.screen, np.array((255,255,255))*brightness, rect)
-        self.screen.blit(self.update_fps(), (10, 10))
-    
-    
-    def get_ray_lenghts(self):
-        ray_lenghts = []
-        for ray in self.player.rays:
-            intersection_point = False
-            for wall in self.world.walls:
-                point = self.check_for_line_line_intersection((wall.A, wall.B), ((self.player.x, self.player.y), (ray.x * self.render_distance + self.player.x, ray.y * self.render_distance + self.player.y)))
-                if point is not False:
-                    if intersection_point is False:
-                        intersection_point = point
-                    elif self.get_distance((self.player.x, self.player.y), point) < self.get_distance((self.player.x, self.player.y), intersection_point):
-                        intersection_point = point
-            if intersection_point is not False:
-                ray_lenght = self.get_distance((self.player.x, self.player.y), intersection_point)
-                if ray_lenght <= self.render_distance:
-                    ray_lenghts.append(self.get_distance((self.player.x, self.player.y), intersection_point))
-                else:
-                    ray_lenghts.append(self.render_distance)
-            else:
-                ray_lenghts.append(self.render_distance)
-        return ray_lenghts
-    
-    
-    def check_for_line_line_intersection(self, line1, line2):
-        x1 = line1[0][0]
-        x2 = line1[1][0]
-        x3 = line2[0][0]
-        x4 = line2[1][0]
-        y1 = line1[0][1]
-        y2 = line1[1][1]
-        y3 = line2[0][1]
-        y4 = line2[1][1]
-        
-        d = ((x1-x2) * (y3-y4) - (y1-y2) * (x3-x4))
-        if d == 0:
-            return False
-        
-        t = ((x1-x3) * (y3-y4) - (y1-y3) * (x3-x4)) / d
-        u = -((x1-x2) * (y1-y3) - (y1-y2) * (x1-x3)) / d
-        
-        if t > 0 and t < 1 and u > 0:
-            x = x1 + t * (x2 - x1)
-            y = y1 + t * (y2 - y1)
-            return (x, y)
-        return False    
-                    
-    def dev_mode_render(self):
-        self.screen.fill((0, 0, 0))   
-        self.dev_blit_walls()
-        self.dev_blit_rays()
-        self.dev_blit_players()
-        self.screen.blit(self.update_fps(), (10, 10))
-    
-    def dev_blit_rays(self):
-        for ray in self.player.rays:
-            intersection_point = False
-            for wall in self.world.walls:
-                point = self.check_for_line_line_intersection((wall.A, wall.B), ((self.player.x, self.player.y), (ray.x * self.render_distance + self.player.x, ray.y * self.render_distance + self.player.y)))
-                if point is not False:
-                    if intersection_point is False:
-                        if self.get_distance((self.player.x, self.player.y), point) < self.render_distance:
-                            intersection_point = point
-                    elif self.get_distance((self.player.x, self.player.y), point) < self.get_distance((self.player.x, self.player.y), intersection_point):
-                        intersection_point = point
-                        
-            if intersection_point != False:
-                pygame.draw.line(self.screen, (0,0,255), (self.player.x, self.player.y), intersection_point)
-            else:
-                pygame.draw.line(self.screen, (0,0,255), (self.player.x, self.player.y), (ray.x * self.render_distance + self.player.x, ray.y * self.render_distance + self.player.y))
-    
-    
-    def update_fps(self):
-        fps = str(int(self.clock.get_fps()))
-        fps_text = self.font.render(f"FPS: {fps}", 1, pygame.Color("white"))
-        return fps_text
-    
-    def dev_blit_players(self):
-        pygame.draw.circle(self.screen, (0,255,0), (self.player.x, self.player.y), 10, 10)
-        for enemy in self.enemy_list:
-            pygame.draw.circle(self.screen, (255,0,0), (enemy.x, enemy.y), 5, 5)
-        return True
-    
-    def dev_blit_walls(self):
-        for wall in self.world.walls:
-            pygame.draw.line(self.screen, (255,255,255), (wall.x1, wall.y1), (wall.x2, wall.y2))
-        return True
-    
-    def vectro_scale(self, x, y, r):
-        v_l = (x**2 + y**2)**0.5
-        if v_l == 0:
-            return 0, 0
-        return x*r / v_l, y*r / v_l
-    
-    def get_distance(self, p1, p2, sqrt=True):
-        d = np.power(np.subtract(p1[0], p2[0]), 2) + np.power(np.subtract(p1[1], p2[1]), 2)
-        if sqrt:
-            d = np.sqrt(d)
-        return d
-        
-    def map(self, v, fromMin, fromMax, toMin, toMax):
-        fromSpan = fromMax - fromMin
-        toSpan = toMax - toMin
-        valueScaled = float(v - fromMin) / float(fromSpan)
-        return toMin + (valueScaled * toSpan)
-        
+        pygame.quit()
 
 
-game = Game()
-game.run()
+if __name__ == "__main__":
+    game = Game()
+    game.run()
