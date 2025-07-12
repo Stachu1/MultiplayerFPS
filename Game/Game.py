@@ -11,6 +11,7 @@ class Game:
         self.screen_height = screen_size[1]
         self.fps_target = fps_target
         self.ping = 999
+        self.hit_mark_frame = 0
         self.all_players = []
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.DOUBLEBUF | pygame.HWSURFACE)
         pygame.display.set_caption('MultiplayerFPS')
@@ -26,7 +27,7 @@ class Game:
         self.keys_pressed = {
             'w': False, 'a': False, 's': False, 'd': False,
             'left': False, 'right': False, 'mouse_left': False,
-            'shot': False
+            'shoot': False
         }
         
         # Mouse settings
@@ -57,7 +58,6 @@ class Game:
                     self.keys_pressed['a'] = True
                 elif event.key == pygame.K_s:
                     self.keys_pressed['s'] = True
-                    self.player.damage_queue.append({'id': self.player.id, 'damage': 10})  # Example damage
                 elif event.key == pygame.K_d:
                     self.keys_pressed['d'] = True
                 elif event.key == pygame.K_LEFT:
@@ -87,7 +87,7 @@ class Game:
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     self.keys_pressed['mouse_left'] = True
-                    self.keys_pressed['shot'] = True
+                    self.keys_pressed['shoot'] = True
             
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
@@ -139,15 +139,16 @@ class Game:
             self.player.y = old_y  # Revert Y movement if hitting wall
         
         # Handle shooting logic here
-        if self.keys_pressed['shot']:
-            self.keys_pressed['shot'] = False
+        if self.keys_pressed['shoot']:
+            self.keys_pressed['shoot'] = False
             hit_info = self.engine.cast_ray_for_players(self.player.x, self.player.y, self.player.angle, self.all_players, exclude_player_id=self.player.id)
             if hit_info is not None:
                 distance_target, _, _, target = hit_info
                 distance_wall, _, _ = self.engine.cast_ray(self.world, self.player.x, self.player.y, self.player.angle)
                 if distance_target < distance_wall:
-                    self.player.damage_given += 10
-                    self.player.damage_queue.append({'id': target.id, 'damage': 10})
+                    self.player.damage_given += self.player.hit_damage
+                    self.player.damage_queue.append({'id': target.id, 'damage': self.player.hit_damage})
+                    self.hit_mark_frame = 5
     
     
     def render(self):
@@ -170,6 +171,16 @@ class Game:
         pos_text = self.font.render(f'HP: {int(self.player.health)}', True, color)
         self.screen.blit(pos_text, (10, self.screen_height - 30))
         
+        # Draw crosshair
+        if self.hit_mark_frame:
+            self.hit_mark_frame -= 1
+            size = 10 - self.hit_mark_frame
+            pygame.draw.line(self.screen, (255, 255, 255), (self.screen_width // 2 - size - 1, self.screen_height // 2 - size - 1), (self.screen_width // 2 + size, self.screen_height // 2 + size), 2)
+            pygame.draw.line(self.screen, (255, 255, 255), (self.screen_width // 2 - size - 1, self.screen_height // 2 + size - 1), (self.screen_width // 2 + size, self.screen_height // 2 - size), 2)
+        
+        pygame.draw.circle(self.screen, (0, 0, 0), (self.screen_width // 2, self.screen_height // 2), 3)
+        pygame.draw.circle(self.screen, (255, 0, 0), (self.screen_width // 2, self.screen_height // 2), 2)
+        
         pygame.display.flip()
     
 
@@ -181,7 +192,7 @@ class Game:
             self.clock.tick(self.fps_target)
             
             if self.player.health <= 0:
-                print('\33[31mYou died!\nKils: {self.player.kills}\nDamage delt: {self.player.damage_given}\33[0m')
+                print(f'\33[31mYou died!\33[0m\nKills: {self.player.kills}\nDamage: {self.player.damage_given}')
                 self.running = False
         
         pygame.quit()

@@ -38,6 +38,7 @@ class Client:
                 for player in self.game.all_players:
                     if player.id == self.game.player.id:
                         self.game.player.health = player.health
+                        self.game.player.kills = player.kills
                         break
                 
                 self.game.ping = (time.monotonic() - start_time) * 1000

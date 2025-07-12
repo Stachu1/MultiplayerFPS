@@ -7,8 +7,9 @@ class Player:
         self.y = y
         self.angle = angle
         self.color = color
+        self.hit_damage = 10
         self.health = 100
-        self.kils = 0
+        self.kills = 0
         self.damage_given = 0
         self.damage_queue = []
         self.radius = 0.1

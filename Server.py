@@ -18,14 +18,20 @@ def threaded_client(conn, player):
                 updated_player = pickle.loads(rx)
                 
                 for p in players:
+                    for val in updated_player.damage_queue:
+                        if val['id'] == p.id:
+                            p.health -= val['damage']
+                            if p.health <= 0:
+                                updated_player.kills += 1
+                
+                for p in players:
                     if p.id == updated_player.id:
                         p.x = updated_player.x
                         p.y = updated_player.y
                         p.angle = updated_player.angle
+                        p.kills = updated_player.kills
                     
-                    for val in updated_player.damage_queue:
-                        if val['id'] == p.id:
-                            p.health -= val['damage']
+                    
                 
                 
                 tx = pickle.dumps(players)
@@ -81,7 +87,7 @@ try:
         player = Player(next_player_id, spawn_x, spawn_y, random.uniform(0, 2 * np.pi), (int(random.random() * 255), int(random.random() * 255), int(random.random() * 255)))
         players.append(player)
         
-        print(f'Player ID: {next_player_id}\33[0m')
+        print(f'Player ID: {next_player_id}\33[0m\nTotal players: {len(players)}')
         
         next_player_id += 1
 
