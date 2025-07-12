@@ -7,6 +7,10 @@ class Player:
         self.y = y
         self.angle = angle
         self.color = color
+        self.health = 100
+        self.kils = 0
+        self.damage_given = 0
+        self.damage_queue = []
         self.radius = 0.1
         self.speed = 0.05
         self.rotation_speed = 0.05

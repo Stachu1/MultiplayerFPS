@@ -6,7 +6,7 @@ class Engine:
         self.screen_height = screen_height
         self.fov = np.pi / 3  # 60 degrees field of view
         self.num_rays = screen_width // 10  # Ray resolution
-        self.max_depth = 15  # Maximum render distance
+        self.render_distance = 15  # Maximum render distance
         self.distance_resolution = 0.1
         self.background = pygame.transform.scale(pygame.image.load('background.png'), (self.screen_width, self.screen_height))
     
@@ -16,17 +16,17 @@ class Engine:
         sin_a = np.sin(angle)
         cos_a = np.cos(angle)
         
-        for depth in range(0, int(self.max_depth / self.distance_resolution)):
-            target_x = start_x + depth * cos_a * self.distance_resolution
-            target_y = start_y + depth * sin_a * self.distance_resolution
+        for distance in range(0, int(self.render_distance / self.distance_resolution)):
+            target_x = start_x + distance * cos_a * self.distance_resolution
+            target_y = start_y + distance * sin_a * self.distance_resolution
             
             if world.is_wall(target_x, target_y):
-                return depth * self.distance_resolution, target_x, target_y
+                return distance * self.distance_resolution, target_x, target_y
         
-        # Return max depth with end position
-        end_x = start_x + self.max_depth * cos_a
-        end_y = start_y + self.max_depth * sin_a
-        return self.max_depth, end_x, end_y
+        # Return max distance with end position
+        end_x = start_x + self.render_distance * cos_a
+        end_y = start_y + self.render_distance * sin_a
+        return self.render_distance, end_x, end_y
     
     
     def cast_ray_for_players(self, start_x, start_y, angle, players, exclude_player_id=None):
@@ -44,23 +44,23 @@ class Engine:
             dy = player.y - start_y
 
             # Project vector onto ray direction
-            proj_length = dx * cos_a + dy * sin_a
+            distance = dx * cos_a + dy * sin_a
 
-            if proj_length < 0:
+            if distance < 0:
                 continue  # Player is behind the ray
 
             # Closest point on ray to player center
-            closest_x = start_x + proj_length * cos_a
-            closest_y = start_y + proj_length * sin_a
+            closest_x = start_x + distance * cos_a
+            closest_y = start_y + distance * sin_a
 
             # Distance from player center to closest point
             dist_to_center = np.hypot(player.x - closest_x, player.y - closest_y)
 
             if dist_to_center <= player.radius:
                 # Ray hits the player
-                if min_distance is None or proj_length < min_distance:
-                    min_distance = proj_length
-                    hit_info = (proj_length, closest_x, closest_y, player)
+                if min_distance is None or distance < min_distance:
+                    min_distance = distance
+                    hit_info = (distance, closest_x, closest_y, player)
 
         if hit_info:
             return hit_info
@@ -96,7 +96,7 @@ class Engine:
             wall_height = min(self.screen_height, self.screen_width / (distance + 0.0001))
             
             # Calculate wall color based on distance (darker = farther)
-            color_intensity = max(0.05, 1 - distance / self.max_depth)
+            color_intensity = max(0.05, 1 - distance / self.render_distance)
             wall_color = (int(255 * color_intensity), int(255 * color_intensity), int(255 * color_intensity))
             
             # Draw wall slice
@@ -116,7 +116,7 @@ class Engine:
                 distance *= np.cos(ray_angle - player.angle)
                 
                 p_height = min(self.screen_height, self.screen_width / (distance + 0.0001))
-                color_intensity = max(0.05, 1 - distance / self.max_depth)
+                color_intensity = max(0.05, 1 - distance / self.render_distance)
                 p_x = ray_id * (self.screen_width / self.num_rays)
                 p_y = (self.screen_height - p_height) / 2
                 p_width = self.screen_width / self.num_rays + 1

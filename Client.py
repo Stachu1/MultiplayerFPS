@@ -29,12 +29,19 @@ class Client:
     def thread(self):
         while self.game.running:
             try:
-                player_data = pickle.dumps(self.game.player)
                 start_time = time.monotonic()
-                self.conn.send(player_data)
-                reply = self.conn.recv(self.max_packet_size)
-                self.game.ping = round((time.monotonic() - start_time) * 1000)
-                self.game.all_players = pickle.loads(reply)
+                self.conn.send(pickle.dumps(self.game.player))
+                self.game.player.damage_queue = []
+                rx = self.conn.recv(self.max_packet_size)
+                self.game.all_players = pickle.loads(rx)
+                
+                for player in self.game.all_players:
+                    if player.id == self.game.player.id:
+                        self.game.player.health = player.health
+                        break
+                
+                self.game.ping = (time.monotonic() - start_time) * 1000
+                
             except EOFError:
                 print('\33[31mServer disconnected\33[0m')
                 self.game.running = False

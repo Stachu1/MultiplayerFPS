@@ -10,7 +10,7 @@ class Game:
         self.screen_width = screen_size[0]
         self.screen_height = screen_size[1]
         self.fps_target = fps_target
-        self.ping = None
+        self.ping = 999
         self.all_players = []
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.DOUBLEBUF | pygame.HWSURFACE)
         pygame.display.set_caption('MultiplayerFPS')
@@ -25,7 +25,8 @@ class Game:
         # Input state
         self.keys_pressed = {
             'w': False, 'a': False, 's': False, 'd': False,
-            'left': False, 'right': False, 'mouse_left': False
+            'left': False, 'right': False, 'mouse_left': False,
+            'shot': False
         }
         
         # Mouse settings
@@ -56,6 +57,7 @@ class Game:
                     self.keys_pressed['a'] = True
                 elif event.key == pygame.K_s:
                     self.keys_pressed['s'] = True
+                    self.player.damage_queue.append({'id': self.player.id, 'damage': 10})  # Example damage
                 elif event.key == pygame.K_d:
                     self.keys_pressed['d'] = True
                 elif event.key == pygame.K_LEFT:
@@ -85,6 +87,7 @@ class Game:
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     self.keys_pressed['mouse_left'] = True
+                    self.keys_pressed['shot'] = True
             
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
@@ -125,17 +128,26 @@ class Game:
         if self.keys_pressed['right']:
             self.rotate_right()
         
-        # Wall sliding collision detection
-        # Try moving on X axis first
+        # Try moving on X axis
         self.player.x += dx
         if self.world.is_wall(self.player.x, self.player.y):
             self.player.x = old_x  # Revert X movement if hitting wall
         
-        # Then try moving on Y axis
+        # Try moving on Y axis
         self.player.y += dy
         if self.world.is_wall(self.player.x, self.player.y):
             self.player.y = old_y  # Revert Y movement if hitting wall
-
+        
+        # Handle shooting logic here
+        if self.keys_pressed['shot']:
+            self.keys_pressed['shot'] = False
+            hit_info = self.engine.cast_ray_for_players(self.player.x, self.player.y, self.player.angle, self.all_players, exclude_player_id=self.player.id)
+            if hit_info is not None:
+                distance_target, _, _, target = hit_info
+                distance_wall, _, _ = self.engine.cast_ray(self.world, self.player.x, self.player.y, self.player.angle)
+                if distance_target < distance_wall:
+                    self.player.damage_given += 10
+                    self.player.damage_queue.append({'id': target.id, 'damage': 10})
     
     
     def render(self):
@@ -146,12 +158,17 @@ class Game:
         
         # Draw FPS
         fps = str(int(self.clock.get_fps()))
-        info = self.font.render(f'{fps} fps   {self.ping} ms', True, (255, 0, 0))
+        info = self.font.render(f'{fps} fps   {self.ping:.2f} ms', True, (255, 0, 0))
         self.screen.blit(info, (10, 10))
         
         # Draw position debug info
         pos_text = self.font.render(f'x: {self.player.x:.2f} y: {self.player.y:.2f}', True, (0, 255, 255))
         self.screen.blit(pos_text, (10, 30))
+        
+        # Draw HP
+        color = (0, 255, 0) if self.player.health > 50 else (255, 255, 0) if self.player.health > 20 else (255, 0, 0)
+        pos_text = self.font.render(f'HP: {int(self.player.health)}', True, color)
+        self.screen.blit(pos_text, (10, self.screen_height - 30))
         
         pygame.display.flip()
     
@@ -162,5 +179,9 @@ class Game:
             self.update()
             self.render()
             self.clock.tick(self.fps_target)
+            
+            if self.player.health <= 0:
+                print('\33[31mYou died!\nKils: {self.player.kills}\nDamage delt: {self.player.damage_given}\33[0m')
+                self.running = False
         
         pygame.quit()
