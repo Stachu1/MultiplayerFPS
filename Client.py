@@ -10,7 +10,6 @@ class Client:
         self.addr = addr
         self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.max_packet_size = 4096
-        self.ping = None
     
     
     def connect(self):
@@ -23,18 +22,26 @@ class Client:
         game_data = self.connect()
         self.game.player = game_data['player']
         self.game.world.map = game_data['world_map']
-        
+        threading.Thread(target=self.thread, args=()).start()
         self.game.run()
     
     
     def thread(self):
         while self.game.running:
-            recv = pickle.dumps(self.player)
-            start_time = time.monotonic()
-            self.client.send(recv)
-            reply = self.client.recv(self.max_packet_size)
-            self.ping = round((time.monotonic() - start_time) * 1000)
-            self.conn.send(pickle.loads(reply))
+            try:
+                player_data = pickle.dumps(self.game.player)
+                start_time = time.monotonic()
+                self.conn.send(player_data)
+                reply = self.conn.recv(self.max_packet_size)
+                self.game.ping = round((time.monotonic() - start_time) * 1000)
+                self.game.all_players = pickle.loads(reply)
+            except EOFError:
+                print('\33[31mServer disconnected\33[0m')
+                self.game.running = False
+            except Exception as e:
+                print(f'\33[31mError in client thread: {e}\33[0m')
+                self.game.running = False
+        self.conn.close()
 
 
 if __name__ == "__main__":

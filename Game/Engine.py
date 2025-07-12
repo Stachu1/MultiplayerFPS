@@ -69,7 +69,7 @@ class Engine:
             pygame.draw.rect(screen, wall_color, (wall_x, wall_y, wall_width, wall_height))
     
     
-    def render_debug(self, screen, player, world, debug_size=200):
+    def render_debug(self, screen, player_id, all_players, world, debug_size=200):
         # Draw debug view in top-right corner
         debug_x = self.screen_width - debug_size - 10
         debug_y = 10
@@ -92,23 +92,24 @@ class Engine:
                     )
                     pygame.draw.rect(screen, (255, 255, 255), wall_rect)
         
-        # Draw player
-        player_debug_x = debug_x + player.x * scale
-        player_debug_y = debug_y + player.y * scale
-        pygame.draw.circle(screen, (0, 255, 0), (int(player_debug_x), int(player_debug_y)), 3)
-        
-        # Draw player direction
-        dir_end_x = player_debug_x + np.cos(player.angle) * 20
-        dir_end_y = player_debug_y + np.sin(player.angle) * 20
-        pygame.draw.line(screen, (0, 255, 0), (player_debug_x, player_debug_y), (dir_end_x, dir_end_y), 2)
-        
-        # Draw rays if we have ray data
-        if hasattr(self, 'ray_data'):
-            for ray in self.ray_data:
-                # Draw ray line
-                ray_end_x = debug_x + ray['hit_x'] * scale
-                ray_end_y = debug_y + ray['hit_y'] * scale
-                pygame.draw.line(screen, (0, 0, 255), (player_debug_x, player_debug_y), (ray_end_x, ray_end_y), 1)
-                
-                # Draw hit point
-                pygame.draw.circle(screen, (255, 0, 0), (int(ray_end_x), int(ray_end_y)), 2)
+        for player in all_players:
+            # Draw player
+            player_debug_x = debug_x + player.x * scale
+            player_debug_y = debug_y + player.y * scale
+            pygame.draw.circle(screen, (0, 255, 0), (int(player_debug_x), int(player_debug_y)), 3)
+            
+            # Draw player direction
+            dir_end_x = player_debug_x + np.cos(player.angle) * 20
+            dir_end_y = player_debug_y + np.sin(player.angle) * 20
+            pygame.draw.line(screen, (0, 255, 0), (player_debug_x, player_debug_y), (dir_end_x, dir_end_y), 2)
+            
+            # Draw rays if we have ray data
+            if player.id == player_id and hasattr(self, 'ray_data'):
+                for ray in self.ray_data:
+                    # Draw ray line
+                    ray_end_x = debug_x + ray['hit_x'] * scale
+                    ray_end_y = debug_y + ray['hit_y'] * scale
+                    pygame.draw.line(screen, (0, 0, 255), (player_debug_x, player_debug_y), (ray_end_x, ray_end_y), 1)
+                    
+                    # Draw hit point
+                    pygame.draw.circle(screen, (255, 0, 0), (int(ray_end_x), int(ray_end_y)), 2)

@@ -10,11 +10,12 @@ class Game:
         self.screen_width = screen_size[0]
         self.screen_height = screen_size[1]
         self.fps_target = fps_target
+        self.ping = None
+        self.all_players = []
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.DOUBLEBUF | pygame.HWSURFACE)
         pygame.display.set_caption('MultiplayerFPS')
-        self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont('Arial', 18)
-        self.all_players = []
+        self.clock = pygame.time.Clock()
         
         # Initialize game objects
         self.player = Player()
@@ -88,6 +89,10 @@ class Game:
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
                     self.keys_pressed['mouse_left'] = False
+                    if self.mouse_visible:
+                        self.mouse_visible = False
+                        pygame.mouse.set_visible(self.mouse_visible)
+                        pygame.event.set_grab(not self.mouse_visible)
     
     
     def update(self, current_fps=60):
@@ -137,12 +142,12 @@ class Game:
         self.engine.render(self.screen, self.player, self.world)
         
         # Draw debug top-down view
-        self.engine.render_debug(self.screen, self.player, self.world)
+        self.engine.render_debug(self.screen, self.player.id, self.all_players, self.world)
         
         # Draw FPS
         fps = str(int(self.clock.get_fps()))
-        fps_text = self.font.render(f'FPS: {fps}', True, (255, 0, 0))
-        self.screen.blit(fps_text, (10, 10))
+        info = self.font.render(f'{fps} fps   {self.ping} ms', True, (255, 0, 0))
+        self.screen.blit(info, (10, 10))
         
         # Draw position debug info
         pos_text = self.font.render(f'x: {self.player.x:.2f} y: {self.player.y:.2f}', True, (0, 255, 255))

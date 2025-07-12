@@ -15,9 +15,17 @@ def threaded_client(conn, player):
             if not recv:
                 break
             else:
-                player = pickle.loads(recv)
+                updated_player = pickle.loads(recv)
+                
+                for p in players:
+                    if p.id == updated_player.id:
+                        p.x = updated_player.x
+                        p.y = updated_player.y
+                        p.angle = updated_player.angle
+                        break
+                
                 reply = pickle.dumps(players)
-                print(f'R:{sys.getsizeof(recv)}    T:{sys.getsizeof(reply)}')
+                # print(f'R:{sys.getsizeof(recv)}    T:{sys.getsizeof(reply)}')
                 conn.send(reply)    # Send reply
                 
         except OSError as e:
