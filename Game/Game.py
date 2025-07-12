@@ -139,7 +139,7 @@ class Game:
     
     
     def render(self):
-        self.engine.render(self.screen, self.player, self.world)
+        self.engine.render(self.screen, self.player, self.all_players, self.world)
         
         # Draw debug top-down view
         self.engine.render_debug(self.screen, self.player.id, self.all_players, self.world)
@@ -161,7 +161,6 @@ class Game:
             self.handle_input()
             self.update()
             self.render()
-            # self.clock.tick(self.fps_target)
-            self.clock.tick()
+            self.clock.tick(self.fps_target)
         
         pygame.quit()

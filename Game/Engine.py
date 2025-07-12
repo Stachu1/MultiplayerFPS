@@ -29,7 +29,45 @@ class Engine:
         return self.max_depth, end_x, end_y
     
     
-    def render(self, screen, player, world):
+    def cast_ray_for_players(self, start_x, start_y, angle, players, exclude_player_id=None):
+        sin_a = np.sin(angle)
+        cos_a = np.cos(angle)
+        min_distance = None
+        hit_info = None
+
+        for player in players:
+            if exclude_player_id is not None and getattr(player, 'id', None) == exclude_player_id:
+                continue
+
+            # Vector from ray start to player center
+            dx = player.x - start_x
+            dy = player.y - start_y
+
+            # Project vector onto ray direction
+            proj_length = dx * cos_a + dy * sin_a
+
+            if proj_length < 0:
+                continue  # Player is behind the ray
+
+            # Closest point on ray to player center
+            closest_x = start_x + proj_length * cos_a
+            closest_y = start_y + proj_length * sin_a
+
+            # Distance from player center to closest point
+            dist_to_center = np.hypot(player.x - closest_x, player.y - closest_y)
+
+            if dist_to_center <= player.radius:
+                # Ray hits the player
+                if min_distance is None or proj_length < min_distance:
+                    min_distance = proj_length
+                    hit_info = (proj_length, closest_x, closest_y, player)
+
+        if hit_info:
+            return hit_info
+        return None
+    
+    
+    def render(self, screen, player, all_players, world):
         # Clear screen
         screen.blit(self.background, (0, 0))
         
@@ -67,6 +105,23 @@ class Engine:
             wall_width = self.screen_width / self.num_rays + 1
             
             pygame.draw.rect(screen, wall_color, (wall_x, wall_y, wall_width, wall_height))
+            
+            
+            # Check for player intersections
+            player_hit_info = self.cast_ray_for_players(player.x, player.y, ray_angle, all_players, exclude_player_id=player.id)
+            
+            if player_hit_info is not None and player_hit_info[0] < distance:
+                distance, hit_x, hit_y, hit_player = player_hit_info
+                          
+                distance *= np.cos(ray_angle - player.angle)
+                
+                p_height = min(self.screen_height, self.screen_width / (distance + 0.0001))
+                color_intensity = max(0.05, 1 - distance / self.max_depth)
+                p_x = ray_id * (self.screen_width / self.num_rays)
+                p_y = (self.screen_height - p_height) / 2
+                p_width = self.screen_width / self.num_rays + 1
+                p_color = tuple(int(c * color_intensity) for c in player.color)
+                pygame.draw.rect(screen, p_color, (p_x, p_y + p_height * 0.2, p_width, p_height * 0.8))
     
     
     def render_debug(self, screen, player_id, all_players, world, debug_size=200):

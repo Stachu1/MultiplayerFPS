@@ -74,7 +74,7 @@ try:
         print(f'\33[32mConnected to: {addr[0]} {addr[1]}', end=' ')
 
         spawn_x, spawn_y = world.random_spawn()
-        player = Player(next_player_id, spawn_x, spawn_y, random.uniform(0, 2 * np.pi))
+        player = Player(next_player_id, spawn_x, spawn_y, random.uniform(0, 2 * np.pi), (int(random.random() * 255), int(random.random() * 255), int(random.random() * 255)))
         players.append(player)
         
         print(f'Player ID: {next_player_id}\33[0m')
