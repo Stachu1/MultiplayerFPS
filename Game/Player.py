@@ -15,11 +15,3 @@ class Player:
         self.radius = 0.1
         self.speed = 0.05
         self.rotation_speed = 0.05
-    
-    
-    def rotate_left(self):
-        self.angle -= self.rotation_speed
-    
-    
-    def rotate_right(self):
-        self.angle += self.rotation_speed

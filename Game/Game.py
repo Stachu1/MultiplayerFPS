@@ -28,7 +28,7 @@ class Game:
         self.keys_pressed = {
             'w': False, 'a': False, 's': False, 'd': False,
             'left': False, 'right': False, 'mouse_left': False,
-            'shoot': False
+            'shoot': False, 'space': False
         }
         
         # Mouse settings
@@ -65,6 +65,9 @@ class Game:
                     self.keys_pressed['left'] = True
                 elif event.key == pygame.K_RIGHT:
                     self.keys_pressed['right'] = True
+                elif event.key == pygame.K_SPACE:
+                    self.keys_pressed['space'] = True
+                    self.keys_pressed['shoot'] = True
             
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_w:
@@ -79,6 +82,8 @@ class Game:
                     self.keys_pressed['left'] = False
                 elif event.key == pygame.K_RIGHT:
                     self.keys_pressed['right'] = False
+                elif event.key == pygame.K_SPACE:
+                    self.keys_pressed['space'] = False
             
             elif event.type == pygame.MOUSEMOTION:
                 # Mouse look
@@ -125,9 +130,9 @@ class Game:
         
         # Handle rotation (arrow keys)
         if self.keys_pressed['left']:
-            self.rotate_left()
+            self.player.angle -= self.player.rotation_speed
         if self.keys_pressed['right']:
-            self.rotate_right()
+            self.player.angle += self.player.rotation_speed
         
         # Try moving on X axis
         self.player.x += dx
