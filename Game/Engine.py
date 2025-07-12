@@ -8,8 +8,9 @@ class Engine:
         self.num_rays = screen_width // 10  # Ray resolution
         self.max_depth = 15  # Maximum render distance
         self.distance_resolution = 0.1
-        self.background = pygame.transform.scale(pygame.image.load("background.png"), (self.screen_width, self.screen_height))
-        
+        self.background = pygame.transform.scale(pygame.image.load('background.png'), (self.screen_width, self.screen_height))
+    
+    
     def cast_ray(self, world, start_x, start_y, angle):
         # Ray casting using DDA algorithm
         sin_a = np.sin(angle)
@@ -26,6 +27,7 @@ class Engine:
         end_x = start_x + self.max_depth * cos_a
         end_y = start_y + self.max_depth * sin_a
         return self.max_depth, end_x, end_y
+    
     
     def render(self, screen, player, world):
         # Clear screen
@@ -66,6 +68,7 @@ class Engine:
             
             pygame.draw.rect(screen, wall_color, (wall_x, wall_y, wall_width, wall_height))
     
+    
     def render_debug(self, screen, player, world, debug_size=200):
         # Draw debug view in top-right corner
         debug_x = self.screen_width - debug_size - 10
@@ -78,9 +81,9 @@ class Engine:
         pygame.draw.rect(screen, (50, 50, 50), (debug_x, debug_y, debug_size, debug_size))
         
         # Draw grid and walls
-        for y in range(len(world.grid)):
-            for x in range(len(world.grid[0])):
-                if world.grid[y][x] == 1:  # Wall
+        for y in range(len(world.map)):
+            for x in range(len(world.map[0])):
+                if world.map[y][x] == 1:  # Wall
                     wall_rect = pygame.Rect(
                         debug_x + x * scale+1,
                         debug_y + y * scale+1,

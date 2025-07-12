@@ -5,30 +5,32 @@ from Game.Engine import Engine
 
 
 class Game:
-    def __init__(self, screen_size=(1200, 700), fps_target=60, ):
+    def __init__(self, screen_size=(1200, 700), fps_target=60):
         pygame.init()
         self.screen_width = screen_size[0]
         self.screen_height = screen_size[1]
         self.fps_target = fps_target
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.DOUBLEBUF | pygame.HWSURFACE)
-        pygame.display.set_caption("MultiplayerFPS")
+        pygame.display.set_caption('MultiplayerFPS')
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont("Arial", 18)
+        self.font = pygame.font.SysFont('Arial', 18)
+        self.all_players = []
         
         # Initialize game objects
-        self.player = Player(1.5, 1.5, 0)
+        self.player = Player()
         self.world = World()
         self.engine = Engine(self.screen_width, self.screen_height)
         
         # Input state
         self.keys_pressed = {
             'w': False, 'a': False, 's': False, 'd': False,
-            'left': False, 'right': False
+            'left': False, 'right': False, 'mouse_left': False
         }
         
         # Mouse settings
-        pygame.mouse.set_visible(False)
-        pygame.event.set_grab(True)
+        self.mouse_visible = False
+        pygame.mouse.set_visible(self.mouse_visible)
+        pygame.event.set_grab(not self.mouse_visible)
         self.mouse_sensitivity = 0.002
         
         self.running = True
@@ -41,7 +43,12 @@ class Game:
             
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    self.running = False
+                    if self.mouse_visible:
+                        self.running = False
+                    else:
+                        self.mouse_visible = True
+                        pygame.mouse.set_visible(self.mouse_visible)
+                        pygame.event.set_grab(not self.mouse_visible)
                 elif event.key == pygame.K_w:
                     self.keys_pressed['w'] = True
                 elif event.key == pygame.K_a:
@@ -73,13 +80,22 @@ class Game:
                 # Mouse look
                 mouse_dx = event.rel[0]
                 self.player.angle += mouse_dx * self.mouse_sensitivity
+            
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    self.keys_pressed['mouse_left'] = True
+            
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:
+                    self.keys_pressed['mouse_left'] = False
     
     
-    def update(self):
+    def update(self, current_fps=60):
         # Store old position for collision detection
         old_x, old_y = self.player.x, self.player.y
         
-        speed_sacle = 60 / self.clock.get_fps() if self.clock.get_fps() > 0 else 1
+        current_fps = self.clock.get_fps()
+        speed_sacle = 60 / current_fps if current_fps > 0 else 1
         
         # Calculate movement deltas
         dx, dy = 0, 0
@@ -100,9 +116,9 @@ class Game:
         
         # Handle rotation (arrow keys)
         if self.keys_pressed['left']:
-            self.player.rotate_left()
+            self.rotate_left()
         if self.keys_pressed['right']:
-            self.player.rotate_right()
+            self.rotate_right()
         
         # Wall sliding collision detection
         # Try moving on X axis first
@@ -114,6 +130,7 @@ class Game:
         self.player.y += dy
         if self.world.is_wall(self.player.x, self.player.y):
             self.player.y = old_y  # Revert Y movement if hitting wall
+
     
     
     def render(self):
@@ -124,11 +141,11 @@ class Game:
         
         # Draw FPS
         fps = str(int(self.clock.get_fps()))
-        fps_text = self.font.render(f"FPS: {fps}", True, (255, 0, 0))
+        fps_text = self.font.render(f'FPS: {fps}', True, (255, 0, 0))
         self.screen.blit(fps_text, (10, 10))
         
         # Draw position debug info
-        pos_text = self.font.render(f"x: {self.player.x:.2f} y: {self.player.y:.2f}", True, (0, 255, 255))
+        pos_text = self.font.render(f'x: {self.player.x:.2f} y: {self.player.y:.2f}', True, (0, 255, 255))
         self.screen.blit(pos_text, (10, 30))
         
         pygame.display.flip()
