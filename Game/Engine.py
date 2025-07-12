@@ -8,7 +8,7 @@ class Engine:
         self.num_rays = screen_width // 10  # Ray resolution
         self.render_distance = 15  # Maximum render distance
         self.distance_resolution = 0.1
-        self.background = pygame.transform.scale(pygame.image.load('background.png'), (self.screen_width, self.screen_height))
+        self.background = pygame.transform.scale(pygame.image.load('game/background.png'), (self.screen_width, self.screen_height))
     
     
     def cast_ray(self, world, start_x, start_y, angle):

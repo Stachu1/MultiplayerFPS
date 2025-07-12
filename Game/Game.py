@@ -17,6 +17,7 @@ class Game:
         pygame.display.set_caption('MultiplayerFPS')
         self.font = pygame.font.SysFont('Arial', 18)
         self.clock = pygame.time.Clock()
+        self.hit_sound = pygame.mixer.Sound('game/hit.wav')
         
         # Initialize game objects
         self.player = Player()
@@ -149,6 +150,7 @@ class Game:
                     self.player.damage_given += self.player.hit_damage
                     self.player.damage_queue.append({'id': target.id, 'damage': self.player.hit_damage})
                     self.hit_mark_frame = 5
+                    self.hit_sound.play()
     
     
     def render(self):
