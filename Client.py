@@ -19,7 +19,11 @@ class Client:
     
     
     def run(self):
-        game_data = self.connect()
+        try:
+            game_data = self.connect()
+        except ConnectionRefusedError:
+            print(f'\33[31mConnection to server {self.addr[0]} {self.addr[1]} failed\33[0m')
+            sys.exit(1)
         self.game.player = game_data['player']
         self.game.world.map = game_data['world_map']
         threading.Thread(target=self.thread, args=()).start()
@@ -33,6 +37,7 @@ class Client:
                 self.conn.send(pickle.dumps(self.game.player))
                 self.game.player.damage_queue = []
                 rx = self.conn.recv(self.max_packet_size)
+                self.game.ping = (time.monotonic() - start_time) * 1000
                 self.game.all_players = pickle.loads(rx)
                 
                 for player in self.game.all_players:
@@ -40,8 +45,6 @@ class Client:
                         self.game.player.health = player.health
                         self.game.player.kills = player.kills
                         break
-                
-                self.game.ping = (time.monotonic() - start_time) * 1000
                 
             except EOFError:
                 print('\33[31mServer disconnected\33[0m')

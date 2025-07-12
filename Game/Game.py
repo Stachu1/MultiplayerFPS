@@ -154,7 +154,7 @@ class Game:
                 if distance_target < distance_wall:
                     self.player.damage_given += self.player.hit_damage
                     self.player.damage_queue.append({'id': target.id, 'damage': self.player.hit_damage})
-                    self.hit_mark_frame = 5
+                    self.hit_mark_frame = 3
                     self.hit_sound.play()
     
     
@@ -166,7 +166,7 @@ class Game:
         
         # Draw FPS
         fps = str(int(self.clock.get_fps()))
-        info = self.font.render(f'{fps} fps   {self.ping:.2f} ms', True, (255, 0, 0))
+        info = self.font.render(f'{fps} fps   {self.ping:.0f} ms', True, (255, 0, 0))
         self.screen.blit(info, (10, 10))
         
         # Draw position debug info
@@ -181,7 +181,7 @@ class Game:
         # Draw crosshair
         if self.hit_mark_frame:
             self.hit_mark_frame -= 1
-            size = 10 - self.hit_mark_frame
+            size = 8 - self.hit_mark_frame
             pygame.draw.line(self.screen, (255, 255, 255), (self.screen_width // 2 - size - 1, self.screen_height // 2 - size - 1), (self.screen_width // 2 + size, self.screen_height // 2 + size), 2)
             pygame.draw.line(self.screen, (255, 255, 255), (self.screen_width // 2 - size - 1, self.screen_height // 2 + size - 1), (self.screen_width // 2 + size, self.screen_height // 2 - size), 2)
         
