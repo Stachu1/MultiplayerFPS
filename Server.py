@@ -10,7 +10,7 @@ def threaded_client(conn, player):
 
     while True:
         try:
-            rx = conn.recv(4096)
+            rx = conn.recv(2048)
 
             if not rx:
                 break

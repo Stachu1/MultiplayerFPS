@@ -9,7 +9,7 @@ class Client:
         self.game = Game()
         self.addr = addr
         self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.max_packet_size = 4096
+        self.max_packet_size = 2048
     
     
     def connect(self):
@@ -33,11 +33,12 @@ class Client:
     def thread(self):
         while self.game.running:
             try:
+                tx = pickle.dumps(self.game.player)
                 start_time = time.monotonic()
-                self.conn.send(pickle.dumps(self.game.player))
-                self.game.player.damage_queue = []
+                self.conn.send(tx)
                 rx = self.conn.recv(self.max_packet_size)
                 self.game.ping = (time.monotonic() - start_time) * 1000
+                self.game.player.damage_queue = []
                 self.game.all_players = pickle.loads(rx)
                 
                 for player in self.game.all_players:

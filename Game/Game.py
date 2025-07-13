@@ -166,7 +166,7 @@ class Game:
         
         # Draw FPS
         fps = str(int(self.clock.get_fps()))
-        info = self.font.render(f'{fps} fps   {self.ping:.0f} ms', True, (255, 0, 0))
+        info = self.font.render(f'{fps:>3} fps   {self.ping:>3.0f} ms', True, (255, 0, 0))
         self.screen.blit(info, (10, 10))
         
         # Draw position debug info
