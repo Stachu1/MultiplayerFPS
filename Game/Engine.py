@@ -1,31 +1,62 @@
 import pygame, numpy as np
 
 class Engine:
-    def __init__(self, screen_width, screen_height):
-        self.screen_width = screen_width
-        self.screen_height = screen_height
-        self.fov = np.pi / 3  # 60 degrees field of view
-        self.num_rays = screen_width // 4  # Ray resolution
-        self.render_distance = 15  # Maximum render distance
-        self.distance_resolution = 0.1
+    def __init__(self, screen_size, fov, render_scale):
+        self.screen_width = screen_size[0]
+        self.screen_height = screen_size[1]
+        self.render_scale = render_scale
+        self.fov = fov
+        self.num_rays = int(self.screen_width * render_scale)
+        self.render_distance = 16
         self.background = pygame.transform.scale(pygame.image.load('game/background.png'), (self.screen_width, self.screen_height))
     
     
     def cast_ray(self, world, start_x, start_y, angle):
-        # Ray casting using DDA algorithm
+        # Ray casting using the DDA algorithm
+        map_x = int(start_x)
+        map_y = int(start_y)
         sin_a = np.sin(angle)
         cos_a = np.cos(angle)
-        
-        for distance in range(0, int(self.render_distance / self.distance_resolution)):
-            target_x = start_x + distance * cos_a * self.distance_resolution
-            target_y = start_y + distance * sin_a * self.distance_resolution
-            
-            if world.is_wall(target_x, target_y):
-                return distance * self.distance_resolution, target_x, target_y
-        
-        # Return max distance with end position
-        end_x = start_x + self.render_distance * cos_a
-        end_y = start_y + self.render_distance * sin_a
+
+        # Calculate direction of the ray
+        delta_dist_x = abs(1 / cos_a) if cos_a != 0 else float('inf')
+        delta_dist_y = abs(1 / sin_a) if sin_a != 0 else float('inf')
+
+        # Calculate step and initial sideDist
+        if cos_a < 0:
+            step_x = -1
+            side_dist_x = (start_x - map_x) * delta_dist_x
+        else:
+            step_x = 1
+            side_dist_x = (map_x + 1.0 - start_x) * delta_dist_x
+
+        if sin_a < 0:
+            step_y = -1
+            side_dist_y = (start_y - map_y) * delta_dist_y
+        else:
+            step_y = 1
+            side_dist_y = (map_y + 1.0 - start_y) * delta_dist_y
+
+        distance = 0
+        while distance < self.render_distance:
+            if side_dist_x < side_dist_y:
+                map_x += step_x
+                distance = side_dist_x
+                side_dist_x += delta_dist_x
+            else:
+                map_y += step_y
+                distance = side_dist_y
+                side_dist_y += delta_dist_y
+
+            # Check if ray has hit a wall
+            if world.is_wall(map_x, map_y):
+                hit_x = start_x + cos_a * distance
+                hit_y = start_y + sin_a * distance
+                return distance, hit_x, hit_y
+
+        # No wall hit, return max distance
+        end_x = start_x + cos_a * self.render_distance
+        end_y = start_y + sin_a * self.render_distance
         return self.render_distance, end_x, end_y
     
     

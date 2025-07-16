@@ -6,13 +6,14 @@ from Game.Game import Game
 
 class Client:
     def __init__(self, addr=('localhost', 8080)):
-        self.game = Game()
+        self.game = None
         self.addr = addr
         self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.max_packet_size = 2048
     
     
     def connect(self):
+        self.conn.settimeout(5)
         self.conn.connect(self.addr)
         game_data = pickle.loads(self.conn.recv(self.max_packet_size))
         return game_data
@@ -21,11 +22,13 @@ class Client:
     def run(self):
         try:
             game_data = self.connect()
-        except ConnectionRefusedError:
+        except (socket.timeout, ConnectionRefusedError, OSError):
             print(f'\33[31mConnection to server {self.addr[0]} {self.addr[1]} failed\33[0m')
             sys.exit(1)
+        self.game = Game((1200, 700), fps_limit=0, render_scale=0.8)
         self.game.player = game_data['player']
         self.game.world.map = game_data['world_map']
+        self.game.engine.render_distance = max(len(self.game.world.map), len(self.game.world.map[0]))
         threading.Thread(target=self.thread, args=()).start()
         self.game.run()
     

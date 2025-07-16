@@ -5,11 +5,11 @@ from Game.Engine import Engine
 
 
 class Game:
-    def __init__(self, screen_size=(1200, 700), fps_target=60):
+    def __init__(self, screen_size=(1200, 700), fps_limit=60, fov=np.pi/3, render_scale=0.5):
         pygame.init()
         self.screen_width = screen_size[0]
         self.screen_height = screen_size[1]
-        self.fps_target = fps_target
+        self.fps_limit = fps_limit
         self.ping = 999
         self.hit_mark_frame = 0
         self.all_players = []
@@ -22,7 +22,7 @@ class Game:
         # Initialize game objects
         self.player = Player()
         self.world = World()
-        self.engine = Engine(self.screen_width, self.screen_height)
+        self.engine = Engine(screen_size, fov, render_scale)
         
         # Input state
         self.keys_pressed = {
@@ -196,7 +196,7 @@ class Game:
             self.handle_input()
             self.update()
             self.render()
-            self.clock.tick(self.fps_target)
+            self.clock.tick(self.fps_limit)
             
             if self.player.health <= 0:
                 print(f'\33[31mYou died!\33[0m\nKills: {self.player.kills}\nDamage: {self.player.damage_given}')
