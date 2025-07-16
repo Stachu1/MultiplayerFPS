@@ -15,7 +15,9 @@ A multiplayer first-person shooter built with Python using raycasting for semi-3
 
 ## Screenshots
 
-*Add screenshots of your game here*
+<img width="1200" height="733" alt="image" src="https://github.com/user-attachments/assets/bb1a9ccc-3451-4059-ae88-1e2df378a8a5" />
+<img width="1200" height="733" alt="image" src="https://github.com/user-attachments/assets/944a2f1b-d2bd-4adc-a543-e779ae4b546a" />
+
 
 ## Requirements
 
