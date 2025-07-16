@@ -37,11 +37,11 @@ class Client:
         while self.game.running:
             try:
                 tx = pickle.dumps(self.game.player)
+                self.game.player.damage_queue = []
                 start_time = time.monotonic()
                 self.conn.send(tx)
                 rx = self.conn.recv(self.max_packet_size)
                 self.game.ping = (time.monotonic() - start_time) * 1000
-                self.game.player.damage_queue = []
                 self.game.all_players = pickle.loads(rx)
                 
                 for player in self.game.all_players:
