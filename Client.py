@@ -25,7 +25,7 @@ class Client:
         except (socket.timeout, ConnectionRefusedError, OSError):
             print(f'\33[31mConnection to server {self.addr[0]} {self.addr[1]} failed\33[0m')
             sys.exit(1)
-        self.game = Game((1200, 700), fps_limit=0, render_scale=0.8)
+        self.game = Game((1200, 700), fps_limit=0, fov=1.4, render_scale=0.8)
         self.game.player = game_data['player']
         self.game.world.map = game_data['world_map']
         self.game.engine.render_distance = max(len(self.game.world.map), len(self.game.world.map[0]))

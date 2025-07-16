@@ -155,15 +155,16 @@ class Engine:
                 pygame.draw.rect(screen, p_color, (p_x, p_y + p_height * 0.2, p_width, p_height * 0.8))
     
     
-    def render_debug(self, screen, player_id, all_players, world, debug_size=200):
-        # Draw debug view in top-right corner
+    def mini_map(self, screen, player_id, all_players, world, scale=0.15):
+        # Draw the mini-map view in top-right corner
+        debug_size = int(self.screen_width * scale)
         debug_x = self.screen_width - debug_size - 10
         debug_y = 10
         
-        # Scale factor to fit the world in the debug view
-        scale = debug_size / 16  # 16 is the grid size
+        # Scale factor to fit the world in the mini-map
+        scale = debug_size / max(len(world.map), len(world.map[0]))
         
-        # Draw debug background
+        # Draw background
         pygame.draw.rect(screen, (50, 50, 50), (debug_x, debug_y, debug_size, debug_size))
         
         # Draw grid and walls
@@ -182,11 +183,11 @@ class Engine:
             color = (0, 255, 0) if player.id == player_id else (255, 0, 0)
             player_debug_x = debug_x + player.x * scale
             player_debug_y = debug_y + player.y * scale
-            pygame.draw.circle(screen, color, (int(player_debug_x), int(player_debug_y)), 3)
+            pygame.draw.circle(screen, color, (int(player_debug_x), int(player_debug_y)), scale // 3)
             
             # Draw player direction
-            dir_end_x = player_debug_x + np.cos(player.angle) * 10
-            dir_end_y = player_debug_y + np.sin(player.angle) * 10
+            dir_end_x = player_debug_x + np.cos(player.angle) * scale
+            dir_end_y = player_debug_y + np.sin(player.angle) * scale
             pygame.draw.line(screen, color, (player_debug_x, player_debug_y), (dir_end_x, dir_end_y), 1)
             
             # Draw rays if we have ray data

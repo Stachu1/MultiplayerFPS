@@ -161,8 +161,8 @@ class Game:
     def render(self):
         self.engine.render(self.screen, self.player, self.all_players, self.world)
         
-        # Draw debug top-down view
-        self.engine.render_debug(self.screen, self.player.id, self.all_players, self.world)
+        # Draw mini-map
+        self.engine.mini_map(self.screen, self.player.id, self.all_players, self.world)
         
         # Draw FPS
         fps = str(int(self.clock.get_fps()))
