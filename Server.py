@@ -57,12 +57,13 @@ def get_local_ip():
 
 
 
-world = World()
-world.load('maps/map_1.txt')
-
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_ip = get_local_ip()
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
+
+world = World()
+map_name = 'maps/' + sys.argv[2] if len(sys.argv) > 2 else 'maps/map_1.txt'
+world.load(map_name)
 
 try:
     s.bind((server_ip, port))
